@@ -1,0 +1,25 @@
+services:
+  arena:
+    build:
+      context: .
+      args:
+        FOOTER_COPYRIGHT: ${FOOTER_COPYRIGHT:-}
+        FOOTER_ICP: ${FOOTER_ICP:-}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/data
+    environment:
+      DATABASE_URL: file:/data/arena.db
+      JWT_SECRET: ${JWT_SECRET}
+      JACCOUNT_CLIENT_ID: ${JACCOUNT_CLIENT_ID:-}
+      JACCOUNT_CLIENT_SECRET: ${JACCOUNT_CLIENT_SECRET:-}
+      JACCOUNT_REDIRECT_URI: ${JACCOUNT_REDIRECT_URI:-}
+      FOOTER_COPYRIGHT: ${FOOTER_COPYRIGHT:-}
+      FOOTER_ICP: ${FOOTER_ICP:-}
+      # Per-LLM-account concurrent call limit. Submissions sharing the same LLM
+      # account share this pool; different LLM accounts are fully independent.
+      LLM_CONCURRENCY: ${LLM_CONCURRENCY:-15}
+      # How many submissions the worker thread processes concurrently.
+      SUBMISSION_CONCURRENCY: ${SUBMISSION_CONCURRENCY:-10}
+    restart: unless-stopped

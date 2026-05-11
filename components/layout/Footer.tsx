@@ -1,0 +1,62 @@
+"use client";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+
+interface Stats {
+  visits: number;
+  users: number;
+  online: number;
+}
+
+export function Footer({ copyright, icp }: { copyright?: string; icp?: string }) {
+  const { user, loading } = useAuth();
+  const [stats, setStats] = useState<Stats | null>(null);
+
+  useEffect(() => {
+    if (loading) return; // wait for auth to resolve before first ping
+
+    const controller = new AbortController();
+
+    const ping = (countVisit: boolean) => {
+      fetch("/api/stats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user?.id ?? null, countVisit }),
+        signal: controller.signal,
+      })
+        .then((r) => r.json())
+        .then((d) => setStats(d))
+        .catch(() => {});
+    };
+
+    ping(true);
+    const interval = setInterval(() => ping(false), 60000);
+    return () => { controller.abort(); clearInterval(interval); };
+  }, [loading, user?.id]);
+
+  if (!copyright && !icp) return null;
+
+  return (
+    <footer className="border-t py-4 text-center text-xs text-muted-foreground">
+      <p>
+        {copyright && <>© {new Date().getFullYear()} {copyright}. All rights reserved.</>}
+        {copyright && icp && <span className="mx-2">·</span>}
+        {icp && (
+          <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" className="hover:underline">
+            {icp}
+          </a>
+        )}
+        {stats && (
+          <>
+            <span className="mx-2">·</span>
+            访问 {stats.visits.toLocaleString("zh-CN")}
+            <span className="mx-1.5">·</span>
+            注册 {stats.users.toLocaleString("zh-CN")}
+            <span className="mx-1.5">·</span>
+            在线 {stats.online}
+          </>
+        )}
+      </p>
+    </footer>
+  );
+}

@@ -1,0 +1,9 @@
+.git
+.next
+node_modules
+prisma/dev.db
+data/
+.env
+.env.local
+*.log
+README.txt

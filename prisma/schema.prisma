@@ -1,0 +1,349 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  passwordHash  String?
+  role          Role     @default(STUDENT)
+  canPublish    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  // SSO fields — null for password-registered users
+  institution   String?  // provider id, e.g. "jaccount"
+  institutionId String?  // 学号/工号 as provided by the institution
+
+  enrollments          Enrollment[]
+  submissions          Submission[]
+  studentLLMConfigs    StudentLLMConfig[]
+  llmConfigs           LLMConfig[]            @relation("UserLLMConfigs")
+  tasks                Task[]
+  judgeProfiles        JudgeProfile[]
+  publisherApplications PublisherApplication[]
+  reviewedApplications  PublisherApplication[] @relation("ApplicationReviewer")
+  notifications        Notification[]
+  passwordResetTokens  PasswordResetToken[]
+  questionBanks        QuestionBank[]         @relation("UserQuestionBanks")
+}
+
+enum Role {
+  ADMIN
+  STUDENT
+}
+
+// LLM 提供商配置（用于评分器和任务指定接入）
+// createdBy=null 表示管理员系统级配置；有值表示发布者私有配置
+model LLMConfig {
+  id        String   @id @default(cuid())
+  name      String
+  baseUrl   String
+  apiKey    String
+  models    String   @default("")
+  createdAt DateTime @default(now())
+  createdBy String?
+  creator   User?    @relation("UserLLMConfigs", fields: [createdBy], references: [id])
+
+  judgeProfiles JudgeProfile[]
+}
+
+// Judge Profile：可选择 LLM 提供商 + 模型 + 评分提示词
+model JudgeProfile {
+  id           String     @id @default(cuid())
+  name         String
+  llmConfigId  String?    // 管理员系统级 LLM（admin 用）
+  llmConfig    LLMConfig? @relation(fields: [llmConfigId], references: [id])
+  studentLLMConfigId String?        // 发布者个人 LLM（canPublish 非 admin 用）
+  studentLLMConfig   StudentLLMConfig? @relation(fields: [studentLLMConfigId], references: [id])
+  model        String?    // 可为空
+  type         JudgeType  @default(SUBJECTIVE)
+  systemPrompt String
+  enableThinking Boolean  @default(true)   // Qwen3 thinking mode (for judge LLM)
+  thinkingBudget Int?                       // null = model default; e.g. 2048 to cap CoT length
+  temperature  Float?                       // null = model default
+  maxTokens    Int?                         // null = use default (2048)
+
+  // Ownership — null means system default template (visible to all publishers)
+  createdBy  String?
+  isDefault  Boolean   @default(false)
+  creator    User?     @relation(fields: [createdBy], references: [id])
+
+  lastTestStatus  String?
+  lastTestedAt    DateTime?
+  lastTestMessage String?
+
+  tasks Task[]
+}
+
+enum JudgeType {
+  OBJECTIVE
+  SUBJECTIVE
+}
+
+// 参赛者的 LLM API 配置（每人可有多个，用于提交时调用）
+model StudentLLMConfig {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  name       String   // 配置名，如"阿里云"、"OpenAI"
+  apiBaseUrl String?
+  apiKey     String?
+  models     String   @default("") // 逗号分隔
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  enrollments   Enrollment[]
+  judgeProfiles JudgeProfile[]
+  adminTasks    Task[]         @relation("AdminStudentLLM")
+}
+
+enum ParticipationMode {
+  ADMIN_LLM
+  OPENAI_COMPATIBLE
+  DIFY
+  COZE
+}
+
+enum QuestionSplit {
+  TRAIN
+  TEST
+  UNUSED
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String
+  status      TaskStatus @default(DRAFT)
+
+  maxPrelimSubs Int @default(3)
+  maxFinalSubs  Int @default(3)
+  topNForFinals Int @default(10)
+  maxTrialRuns  Int @default(15)
+
+  judgeProfileId String?
+  judgeProfile   JudgeProfile? @relation(fields: [judgeProfileId], references: [id])
+
+  // 管理员指定接入模式
+  adminLLMEnabled          Boolean           @default(false)
+  adminStudentLLMConfigId  String?
+  adminStudentLLMConfig    StudentLLMConfig? @relation("AdminStudentLLM", fields: [adminStudentLLMConfigId], references: [id])
+  adminModel               String?
+  adminPrompt         String?
+  adminEnableThinking Boolean    @default(false)
+  adminThinkingBudget Int?
+  adminTemperature    Float?
+  adminMaxTokens      Int?
+
+  // Ownership & subscription
+  createdBy           String?
+  creator             User?     @relation(fields: [createdBy], references: [id])
+  subscribeCode       String?   @unique
+  subscribeCodeEnabled Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  questions   Question[]
+  enrollments Enrollment[]
+  submissions Submission[]
+}
+
+enum TaskStatus {
+  DRAFT
+  PRELIMINARY
+  FINALS
+  ENDED
+}
+
+model Question {
+  id         String  @id @default(cuid())
+  taskId     String
+  task       Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  content    String
+  answer     String?
+  split      QuestionSplit @default(UNUSED)
+  orderIndex Int           @default(0)
+
+  answers Answer[]
+}
+
+// 报名：记录用户参与某任务，并包含该任务的 Chatbot 配置
+model Enrollment {
+  id     String @id @default(cuid())
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  // Per-task chatbot config
+  mode ParticipationMode @default(OPENAI_COMPATIBLE)
+
+  // OPENAI_COMPATIBLE：引用 StudentLLMConfig + 选定模型和 Prompt
+  studentLLMConfigId String?
+  studentLLMConfig   StudentLLMConfig? @relation(fields: [studentLLMConfigId], references: [id])
+  model              String?
+  prompt             String?
+  enableThinking     Boolean @default(false)  // Qwen3 thinking mode
+  thinkingBudget     Int?                     // null = model default; e.g. 2048 to cap CoT length
+  temperature        Float?                   // null = model default
+  maxTokens          Int?                     // null = use default (2048)
+
+  // DIFY
+  difyEndpoint String?
+  difyApiKey   String?
+
+  // COZE
+  cozeEndpoint String?
+  cozeApiKey   String?
+  cozeBotId    String?
+
+  isFinalist    Boolean  @default(false)
+  trialRunsUsed Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  submissions Submission[]
+
+  @@unique([taskId, userId])
+}
+
+model Submission {
+  id           String     @id @default(cuid())
+  taskId       String
+  task         Task       @relation(fields: [taskId], references: [id])
+  userId       String
+  user         User       @relation(fields: [userId], references: [id])
+  enrollmentId String?
+  enrollment   Enrollment? @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+
+  phase   CompetitionPhase
+  status  SubmissionStatus @default(PENDING)
+  version Int              @default(1)
+  isFinal Boolean          @default(false)
+
+  publicScore     Float?
+  privateScore    Float?
+  finalScore      Float?
+  errorMessage    String?
+  promptSnapshot  String?  // snapshot of enrollment.prompt (or chatbot type) at submission time
+
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  answers Answer[]
+
+  @@index([taskId, userId])
+  @@index([enrollmentId, phase, status])
+  @@index([taskId, status, isFinal])
+}
+
+enum CompetitionPhase {
+  PRELIMINARY
+  FINALS
+}
+
+enum SubmissionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SYSERR  // All questions failed due to system/LLM errors; does not count against submission limit
+}
+
+model Answer {
+  id           String     @id @default(cuid())
+  submissionId String
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  questionId   String
+  question     Question   @relation(fields: [questionId], references: [id])
+
+  rawInput    String?  // full prompt/messages sent to LLM
+  rawThinking String?  // Qwen3 reasoning_content (chain-of-thought)
+  rawOutput   String
+  score       Float?
+  judgeReason String?
+
+  createdAt DateTime @default(now())
+}
+
+model SystemConfig {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}
+
+model PublisherApplication {
+  id           String            @id @default(cuid())
+  userId       String
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  institution  String
+  homepage     String?
+  purpose      String
+  status       ApplicationStatus @default(PENDING)
+  rejectReason String?
+  createdAt    DateTime          @default(now())
+  reviewedAt   DateTime?
+  reviewedBy   String?
+  reviewer     User?             @relation("ApplicationReviewer", fields: [reviewedBy], references: [id])
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // "PUBLISHER_GRANTED" | "NEW_APPLICATION" | "APPLICATION_REJECTED"
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  refId     String?  // optional reference to related entity (e.g. application id)
+  createdAt DateTime @default(now())
+}
+
+model QuestionBank {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  isSample    Boolean  @default(false)
+  createdBy   String?
+  creator     User?    @relation("UserQuestionBanks", fields: [createdBy], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items QuestionBankItem[]
+}
+
+model QuestionBankItem {
+  id         String       @id @default(cuid())
+  bankId     String
+  bank       QuestionBank @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  content    String
+  answer     String?
+  orderIndex Int          @default(0)
+  createdAt  DateTime     @default(now())
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+}
+
+model SiteStat {
+  key   String @id
+  value Int    @default(0)
+}
