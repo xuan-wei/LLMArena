@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { ConnectivityTestDialog } from "@/components/ConnectivityTestDialog";
 
 interface LLMConfig {
   id: string;
@@ -29,6 +30,7 @@ export default function LLMConfigsPage() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState<string | null>(null);
+  const [testDialog, setTestDialog] = useState<{ open: boolean; status: "testing" | "success" | "fail"; message?: string; preview?: string }>({ open: false, status: "testing" });
 
   useEffect(() => {
     if (!loading) {
@@ -79,24 +81,33 @@ export default function LLMConfigsPage() {
 
   const testConfig = async (c: LLMConfig) => {
     setTesting(c.id);
+    setTestDialog({ open: true, status: "testing" });
     try {
-      const res = await authFetch(`/api/admin/llm-configs/${c.id}/test`, { method: "POST" });
-      const data = await res.json();
+      const [res] = await Promise.all([
+        authFetch(`/api/admin/llm-configs/${c.id}/test`, { method: "POST" }),
+        new Promise((r) => setTimeout(r, 2000)),
+      ]);
+      const data = await (res as Response).json();
       if (data.ok) {
-        toast.success(`✓ 连接成功（模型：${data.model}）回复: ${data.preview}`);
+        setTestDialog({ open: true, status: "success", preview: `模型：${data.model}，回复: ${data.preview}` });
+        setTimeout(() => setTestDialog((v) => ({ ...v, open: false })), 2000);
       } else {
-        toast.error(`✗ 连接失败: ${data.error}`);
+        setTestDialog({ open: true, status: "fail", message: data.error || "连接失败" });
       }
     } catch {
-      toast.error("测试请求失败");
+      setTestDialog({ open: true, status: "fail", message: "测试请求失败" });
     } finally {
       setTesting(null);
     }
   };
 
   const del = async (id: string) => {
+    if (!confirm("确定删除这个 LLM 配置吗？如果已有评分器正在使用它，将无法删除。")) return;
     const res = await authFetch(`/api/admin/llm-configs/${id}`, { method: "DELETE" });
-    if (!res.ok) return toast.error("删除失败（可能有评分器正在使用）");
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      return toast.error(data.error || "删除失败");
+    }
     load();
     toast.success("已删除");
   };
@@ -196,6 +207,13 @@ export default function LLMConfigsPage() {
           </DialogContent>
         </Dialog>
       </main>
+      <ConnectivityTestDialog
+        open={testDialog.open}
+        status={testDialog.status}
+        message={testDialog.message}
+        preview={testDialog.preview}
+        onClose={() => setTestDialog({ open: false, status: "testing" })}
+      />
     </div>
   );
 }

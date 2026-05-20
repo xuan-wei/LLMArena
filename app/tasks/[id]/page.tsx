@@ -16,7 +16,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import Link from "next/link";
 import { getScoreColors } from "@/lib/scoreColors";
-import { SysErrTooltip } from "@/components/SysErrTooltip";
+import { SysErrTooltip, classifyError, stripTechnicalDetails } from "@/components/SysErrTooltip";
+import { ConnectivityTestDialog } from "@/components/ConnectivityTestDialog";
 
 // ────────── Types ──────────
 interface Task {
@@ -80,6 +81,19 @@ const STATUS_BADGE: Record<string, { label: string; variant: "default" | "second
 const MODE_LABELS: Record<string, string> = {
   ADMIN_LLM: "管理员指定", OPENAI_COMPATIBLE: "LLM（OpenAI API）", DIFY: "Dify Chatbot", COZE: "Coze Chatbot",
 };
+
+const TWENTY_FOUR_POINT_PROMPT =
+  "你正在参加 24 点游戏。题目会给出 4 个数字，请每个数字恰好使用一次，只能使用 +、-、*、/ 和括号，构造一个结果等于 24 的表达式。只输出最终表达式，不要把题目理解成数列规律或预测下一个数字。题目：{{question}}";
+
+function looksLikeTwentyFourPointQuestion(content: string) {
+  const nums = content.match(/-?\d+(?:\.\d+)?/g) ?? [];
+  const stripped = content.replace(/-?\d+(?:\.\d+)?/g, "").replace(/[\s,，、;；:：|/\\()[\]{}.+\-*]/g, "");
+  return nums.length === 4 && stripped.length === 0;
+}
+
+function shouldUseTwentyFourPointPrompt(questions: Question[]) {
+  return questions.length > 0 && questions.slice(0, 5).every((q) => looksLikeTwentyFourPointQuestion(q.content));
+}
 
 // ────────── Main Page ──────────
 export default function TaskPage({ params }: { params: Promise<{ id: string }> }) {
@@ -158,7 +172,7 @@ export default function TaskPage({ params }: { params: Promise<{ id: string }> }
     }).finally(() => setFetching(false));
   }, [user, id]); // eslint-disable-line
 
-  if (loading || fetching || !task) {
+  if (loading || fetching || !task || !user) {
     return <div><Navbar backHref="/dashboard" backLabel="任务列表" /></div>;
   }
 
@@ -188,7 +202,7 @@ export default function TaskPage({ params }: { params: Promise<{ id: string }> }
             <TabsList>
               <TabsTrigger value="enroll">报名 {isEnrolled ? "✓" : ""}</TabsTrigger>
               <TabsTrigger value="chatbot" disabled={!isEnrolled}>Chatbot 配置</TabsTrigger>
-              <TabsTrigger value="submit" disabled={!isEnrolled}>答题</TabsTrigger>
+              <TabsTrigger value="submit" disabled={!isEnrolled}>答题/提交</TabsTrigger>
               <TabsTrigger value="leaderboard" onClick={loadLeaderboard}>排行榜</TabsTrigger>
               <TabsTrigger value="award" onClick={loadAwardLeaderboard}>颁奖</TabsTrigger>
             </TabsList>
@@ -237,7 +251,7 @@ export default function TaskPage({ params }: { params: Promise<{ id: string }> }
                 phaseSubs={phaseSubs}
                 maxSubs={maxSubs}
                 phase={phase}
-                currentUserId={user!.id}
+                currentUserId={user.id}
                 onSaved={(e) => setEnrollment(e)}
                 onSubmitted={() => loadSubmissions()}
                 llmConfigs={llmConfigs}
@@ -253,7 +267,7 @@ export default function TaskPage({ params }: { params: Promise<{ id: string }> }
               finalsLeaderboard={finalsLeaderboard}
               taskStatus={task.status}
               isEnded={isEnded}
-              currentUserId={user!.id}
+              currentUserId={user.id}
               onRefresh={loadLeaderboard}
             />
           </TabsContent>
@@ -409,6 +423,7 @@ function ChatbotTab({
   const [cozeBotId, setCozeBotId] = useState(enrollment.cozeBotId || "");
   const [saving, setSaving] = useState(false);
   const [validating, setValidating] = useState(false);
+  const [testDialog, setTestDialog] = useState<{ open: boolean; status: "testing" | "success" | "fail"; message?: string; preview?: string }>({ open: false, status: "testing" });
 
   const selectedCfg = llmConfigs.find((c) => c.id === selectedConfigId);
   const availableModels = selectedCfg?.models.split(",").map((m) => m.trim()).filter(Boolean) ?? [];
@@ -437,15 +452,23 @@ function ChatbotTab({
 
   const handleValidate = async () => {
     setValidating(true);
+    setTestDialog({ open: true, status: "testing" });
     try {
       await doSave();
-      toast.success("配置已保存");
-      const res = await authFetch(`/api/tasks/${taskId}/enrollment/validate`, { method: "POST" });
-      const data = await res.json();
-      if (data.ok) toast.success(`连通性测试成功！预览: ${data.preview}`);
-      else toast.error(`测试失败: ${data.message}`);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "保存或测试失败"); }
-    finally { setValidating(false); }
+      const [res] = await Promise.all([
+        authFetch(`/api/tasks/${taskId}/enrollment/validate`, { method: "POST" }),
+        new Promise((r) => setTimeout(r, 2000)),
+      ]);
+      const data = await (res as Response).json();
+      if (data.ok) {
+        setTestDialog({ open: true, status: "success", preview: data.preview });
+        setTimeout(() => setTestDialog((v) => ({ ...v, open: false })), 2000);
+      } else {
+        setTestDialog({ open: true, status: "fail", message: data.message || "连接失败" });
+      }
+    } catch (e) {
+      setTestDialog({ open: true, status: "fail", message: e instanceof Error ? e.message : "保存或测试失败" });
+    } finally { setValidating(false); }
   };
 
   return (
@@ -471,6 +494,10 @@ function ChatbotTab({
 
         {mode === "OPENAI_COMPATIBLE" && (
           <>
+            <div className="rounded border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
+              OpenAI 兼容接口通常填写到 <code className="rounded bg-white/70 px-1">/v1</code> 层级，例如{" "}
+              <code className="rounded bg-white/70 px-1">https://api.example.com/v1</code>；模型名需要和服务商控制台中的名称一致。
+            </div>
             {llmConfigs.length === 0 ? (
               <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                 ⚠️ 还没有添加 LLM 账号。
@@ -568,13 +595,13 @@ function ChatbotTab({
         {mode === "DIFY" && (
           <>
             <div className="rounded border border-blue-100 bg-blue-50 p-3 text-sm text-blue-800">
-              题目内容将直接发送给 Dify Chatbot，请在 Dify 平台配置好 Chatbot 逻辑。{" "}
+              题目内容将直接发送给 Dify Chatbot，请在 Dify 平台配置好 Chatbot 逻辑；如果是 24 点题目，请明确要求“每个数字恰好使用一次，构造等于 24 的表达式”。{" "}
               <a href="https://docs.dify.ai/zh/use-dify/publish/developing-with-apis" target="_blank" rel="noopener noreferrer" className="underline font-medium">参考文档 →</a>
             </div>
             <div className="space-y-1.5">
               <Label>Dify API Endpoint</Label>
               <Input value={difyEndpoint} onChange={(e) => setDifyEndpoint(e.target.value)} placeholder="https://api.dify.ai/v1" />
-              <p className="text-xs text-muted-foreground">默认调用 {difyEndpoint.replace(/\/+$/, "")}/chat-messages，通常无需修改</p>
+              <p className="text-xs text-muted-foreground">填写应用 API Endpoint，例如 https://api.dify.ai/v1；系统会自动调用 /chat-messages，通常不要粘贴带查询参数的完整请求 URL。</p>
             </div>
             <div className="space-y-1.5">
               <Label>API Key</Label>
@@ -586,13 +613,13 @@ function ChatbotTab({
         {mode === "COZE" && (
           <>
             <div className="rounded border border-blue-100 bg-blue-50 p-3 text-sm text-blue-800">
-              题目内容将直接发送给 Coze Bot，请在 Coze 平台配置好 Bot 逻辑。{" "}
+              题目内容将直接发送给 Coze Bot，请在 Coze 平台配置好 Bot 逻辑；如果是 24 点题目，请明确要求“每个数字恰好使用一次，构造等于 24 的表达式”。{" "}
               <a href="https://www.coze.cn/open/docs/guides/publish_agent_api" target="_blank" rel="noopener noreferrer" className="underline font-medium">参考文档 →</a>
             </div>
             <div className="space-y-1.5">
               <Label>Coze API Endpoint</Label>
               <Input value={cozeEndpoint} onChange={(e) => setCozeEndpoint(e.target.value)} placeholder="https://api.coze.cn" />
-              <p className="text-xs text-muted-foreground">默认调用 {cozeEndpoint.replace(/[?#].*$/, "").replace(/\/+$/, "").replace(/\/v3\/chat$/, "").replace(/\/v3$/, "")}/v3/chat，通常无需修改</p>
+              <p className="text-xs text-muted-foreground">填写 Coze API 域名，例如 https://api.coze.cn；Bot ID、API Key 从 Coze 发布后的 API 配置中获取。</p>
             </div>
             <div className="space-y-1.5">
               <Label>API Key</Label>
@@ -610,6 +637,13 @@ function ChatbotTab({
           <Button variant="outline" onClick={handleValidate} disabled={validating}>{validating ? "测试中..." : "连通性测试"}</Button>
         </div>
       </CardContent>
+      <ConnectivityTestDialog
+        open={testDialog.open}
+        status={testDialog.status}
+        message={testDialog.message}
+        preview={testDialog.preview}
+        onClose={() => { setTestDialog({ open: false, status: "testing" }); }}
+      />
     </Card>
   );
 }
@@ -628,9 +662,12 @@ function SubmitTab({
   llmConfigs: LLMConfig[];
   authFetch: (url: string, opts?: RequestInit) => Promise<Response>;
 }) {
-  const [prompt, setPrompt] = useState(enrollment.prompt || "");
+  const isTwentyFourPointTask = shouldUseTwentyFourPointPrompt(publicQuestions);
+  const recommendedPrompt = isTwentyFourPointTask ? TWENTY_FOUR_POINT_PROMPT : "请回答以下问题：\n\n{{question}}";
+  const [prompt, setPrompt] = useState(enrollment.prompt || (enrollment.mode === "OPENAI_COMPATIBLE" && isTwentyFourPointTask ? TWENTY_FOUR_POINT_PROMPT : ""));
   const [savingPrompt, setSavingPrompt] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [validateDialog, setValidateDialog] = useState<{ open: boolean; status: "testing" | "success" | "fail"; message?: string }>({ open: false, status: "testing" });
   const [progressSubId, setProgressSubId] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ completed: number; total: number; currentQuestion?: string; phase?: string; done?: boolean }>({ completed: 0, total: 0 });
   const [progressDone, setProgressDone] = useState(false);
@@ -690,8 +727,8 @@ function SubmitTab({
 
   const handleSubmit = async () => {
     setSubmitting(true);
+    setValidateDialog({ open: true, status: "testing" });
     try {
-      // Auto-save prompt if it differs from what's in enrollment
       if ((task.adminLLMEnabled || enrollment.mode === "OPENAI_COMPATIBLE") && prompt !== (enrollment.prompt || "")) {
         const saveRes = await authFetch(`/api/tasks/${taskId}/enrollment`, {
           method: "PUT",
@@ -713,14 +750,31 @@ function SubmitTab({
         if (!saveRes.ok) throw new Error((await saveRes.json()).error || "Prompt 保存失败");
         onSaved({ ...enrollment, prompt });
       }
+
+      const [valRes] = await Promise.all([
+        authFetch(`/api/tasks/${taskId}/enrollment/validate`, { method: "POST" }),
+        new Promise((r) => setTimeout(r, 2000)),
+      ]);
+      const valData = await (valRes as Response).json().catch(() => ({}));
+      if (!valData.ok) {
+        setValidateDialog({ open: true, status: "fail", message: valData.message || "无法连接到 Chatbot" });
+        return;
+      }
+
+      setValidateDialog({ open: true, status: "success" });
+      await new Promise((r) => setTimeout(r, 800));
+      setValidateDialog((v) => ({ ...v, open: false }));
+
       const res = await authFetch(`/api/tasks/${taskId}/submissions`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       onSubmitted();
       startProgress(data.submission.id);
       toast.success("提交成功，正在评测...");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "提交失败"); }
-    finally { setSubmitting(false); }
+    } catch (e) {
+      setValidateDialog((v) => ({ ...v, open: false }));
+      toast.error(e instanceof Error ? e.message : "提交失败");
+    } finally { setSubmitting(false); }
   };
 
   const startProgress = (subId: string) => {
@@ -738,6 +792,12 @@ function SubmitTab({
     };
     es.onerror = () => { es.close(); setProgressDone(true); onSubmitted(); };
   };
+
+  useEffect(() => {
+    if (progressSubId && !progressDone) return;
+    const activeSub = phaseSubs.find((s) => s.status === "PENDING" || s.status === "RUNNING");
+    if (activeSub) startProgress(activeSub.id);
+  }, [phaseSubs, progressSubId, progressDone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const viewDetail = async (subId: string) => {
     const res = await authFetch(`/api/submissions/${subId}`);
@@ -902,11 +962,25 @@ function SubmitTab({
               <CardTitle className="text-sm">Prompt 模板</CardTitle>
             </CardHeader>
             <CardContent className="pb-3 space-y-2">
+              {isTwentyFourPointTask && enrollment.mode === "OPENAI_COMPATIBLE" && (
+                <div className="rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                  当前公开题目看起来是 24 点格式。建议 Prompt 明确写出“每个数字恰好使用一次，构造等于 24 的表达式”，避免模型把题目误解成数列规律。
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="mt-2 h-7 text-xs"
+                    onClick={() => setPrompt(TWENTY_FOUR_POINT_PROMPT)}
+                  >
+                    使用推荐 Prompt
+                  </Button>
+                </div>
+              )}
               <Textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 rows={5}
-                placeholder={"请回答以下问题：\n\n{{question}}"}
+                placeholder={recommendedPrompt}
                 className="font-mono text-xs"
               />
               <p className="text-xs text-muted-foreground">
@@ -1127,7 +1201,7 @@ function SubmitTab({
                                 <span className="font-mono font-medium">v{sub.version}</span>
                                 {sub.isFinal && <Badge className="text-[10px] px-1 py-0">最终</Badge>}
                                 {sub.status === "SYSERR" ? (
-                                  <SysErrTooltip subId={sub.id} authFetch={authFetch} />
+                                  <SysErrTooltip subId={sub.id} authFetch={authFetch} errorMessage={sub.errorMessage} />
                                 ) : (
                                   <Badge variant={st?.variant} className="text-[10px]">{st?.label}</Badge>
                                 )}
@@ -1186,13 +1260,18 @@ function SubmitTab({
             {detailSub?.answers
               ?.filter((ans) => ans.question.split === "TRAIN")
               ?.map((ans) => {
-                const isGenErr = ans.judgeReason?.startsWith("[调用失败]");
+                const isGenErr = ans.rawOutput?.startsWith("[调用失败]");
+                const genErrMsg = isGenErr ? ans.rawOutput.replace(/^\[调用失败\]\s*/, "") : "";
+                const errCategory = isGenErr ? classifyError(genErrMsg) : null;
                 const colors = getScoreColors(ans.score);
                 return (
                   <div key={ans.id} className={`border border-l-4 rounded p-3 text-sm space-y-2 ${colors.border}`}>
                     <div className="flex items-center justify-between gap-2">
-                      <div className="font-medium text-xs text-muted-foreground">
+                      <div className="font-medium text-xs text-muted-foreground flex items-center gap-1.5">
                         Q{ans.question.orderIndex + 1} <span className="ml-1">{colors.icon}</span>
+                        {errCategory && (
+                          <Badge variant="outline" className={`text-[9px] px-1 py-0 ${errCategory.color}`}>{errCategory.label}</Badge>
+                        )}
                       </div>
                       <div className={`px-2 py-0.5 rounded text-xs font-medium ${colors.badge}`}>
                         {ans.score !== null ? `${(ans.score * 100).toFixed(1)}%` : "N/A"}
@@ -1219,7 +1298,7 @@ function SubmitTab({
                       <p className="text-xs text-muted-foreground mb-1">{isGenErr ? "生成错误" : "LLM 输出"}</p>
                       <div className={`rounded p-2 text-xs font-mono whitespace-pre-wrap max-h-48 overflow-y-auto ${isGenErr ? "bg-destructive/10 text-destructive" : "bg-muted"}`}>
                         {isGenErr
-                          ? ans.judgeReason!.replace(/^\[调用失败\] /, "")
+                          ? stripTechnicalDetails(genErrMsg)
                           : (ans.rawOutput || "(无输出)")}
                       </div>
                     </div>
@@ -1234,6 +1313,13 @@ function SubmitTab({
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConnectivityTestDialog
+        open={validateDialog.open}
+        status={validateDialog.status}
+        message={validateDialog.message}
+        onClose={() => { setValidateDialog({ open: false, status: "testing" }); setSubmitting(false); }}
+      />
     </div>
     </div>
   );

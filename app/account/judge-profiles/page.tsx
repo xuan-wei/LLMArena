@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { ConnectivityTestDialog } from "@/components/ConnectivityTestDialog";
 
 const OBJECTIVE_TEMPLATE = `你是一个严格的评判者。请根据题目和参考答案，判断学生答案是否正确。
 
@@ -67,6 +68,7 @@ export default function JudgeProfilesPage() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState<string | null>(null);
+  const [testDialog, setTestDialog] = useState<{ open: boolean; status: "testing" | "success" | "fail"; message?: string; preview?: string }>({ open: false, status: "testing" });
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -170,9 +172,22 @@ export default function JudgeProfilesPage() {
 
   const test = async (profileId: string) => {
     setTesting(profileId);
+    setTestDialog({ open: true, status: "testing" });
     try {
-      await authFetch(`/api/admin/judge-profiles/${profileId}/test`, { method: "POST" });
+      const [res] = await Promise.all([
+        authFetch(`/api/admin/judge-profiles/${profileId}/test`, { method: "POST" }),
+        new Promise((r) => setTimeout(r, 2000)),
+      ]);
+      const data = await (res as Response).json();
       load();
+      if (data.ok) {
+        setTestDialog({ open: true, status: "success", preview: data.response?.slice(0, 200) });
+        setTimeout(() => setTestDialog((v) => ({ ...v, open: false })), 2000);
+      } else {
+        setTestDialog({ open: true, status: "fail", message: data.error || "测试失败" });
+      }
+    } catch {
+      setTestDialog({ open: true, status: "fail", message: "测试请求失败" });
     } finally {
       setTesting(null);
     }
@@ -478,6 +493,14 @@ export default function JudgeProfilesPage() {
           </DialogContent>
         </Dialog>
       </main>
+      <ConnectivityTestDialog
+        open={testDialog.open}
+        status={testDialog.status}
+        message={testDialog.message}
+        preview={testDialog.preview}
+        title="评分器连通性测试"
+        onClose={() => setTestDialog({ open: false, status: "testing" })}
+      />
     </div>
   );
 }

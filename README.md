@@ -25,6 +25,12 @@
 | 部署 | Docker (node:20-alpine)，三阶段构建 |
 | Worker | 独立 worker thread，esbuild 打包 |
 
+## 使用说明书
+
+- [Arena 系统说明书](docs/system-guide.md)
+- [大模型 Prompt 设计大赛配置指南](docs/prompt-contest-guide.md)
+- [大模型智能体大赛配置指南](docs/agent-contest-guide.md)
+
 ## 快速部署（Docker）
 
 1. 安装 Docker 和 Docker Compose

@@ -208,7 +208,18 @@ export default function NewTaskPage() {
                   type="checkbox"
                   id="adminLLMEnabled"
                   checked={adminLLMEnabled}
-                  onChange={(e) => setAdminLLMEnabled(e.target.checked)}
+                  onChange={(e) => {
+                    const enabled = e.target.checked;
+                    setAdminLLMEnabled(enabled);
+                    if (!enabled) {
+                      setAdminStudentLLMConfigId("");
+                      setAdminModel("");
+                      setAdminEnableThinking(false);
+                      setAdminThinkingBudget("");
+                      setAdminTemperature("");
+                      setAdminMaxTokens("");
+                    }
+                  }}
                   className="h-4 w-4"
                 />
                 <Label htmlFor="adminLLMEnabled" className="cursor-pointer font-medium">

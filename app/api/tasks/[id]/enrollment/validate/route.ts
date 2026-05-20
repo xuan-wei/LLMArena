@@ -67,7 +67,7 @@ export async function POST(
   }
 
   try {
-    const { output: response } = await callChatbot(chatbotConfig, PROBE_QUESTION, 15000);
+    const { output: response } = await callChatbot(chatbotConfig, PROBE_QUESTION, 30000);
     if (!response || response.trim().length === 0) return NextResponse.json({ ok: false, message: "Chatbot 返回了空响应" });
     return NextResponse.json({ ok: true, preview: response.slice(0, 200) });
   } catch (error) {

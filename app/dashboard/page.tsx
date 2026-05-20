@@ -165,14 +165,33 @@ function DashboardContent() {
 
   const handleDeleteTask = async (taskId: string) => {
     if (!confirm("确定要删除该活动吗？此操作不可恢复，所有题目、报名和提交记录将一并删除。")) return;
-    const res = await authFetch(`/api/admin/tasks/${taskId}`, { method: "DELETE" });
-    if (!res.ok) {
-      const data = await res.json();
-      toast.error(data.error || "删除失败");
-      return;
+    try {
+      const res = await authFetch(`/api/admin/tasks/${taskId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "删除失败");
+        return;
+      }
+      toast.success("活动已删除");
+      loadTasks();
+    } catch {
+      toast.error("删除失败，请稍后重试");
     }
-    toast.success("活动已删除");
-    loadTasks();
+  };
+
+  const handleCloneTask = async (taskId: string) => {
+    try {
+      const res = await authFetch(`/api/admin/tasks/${taskId}/clone`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || "克隆失败");
+        return;
+      }
+      toast.success("活动已克隆");
+      loadTasks();
+    } catch {
+      toast.error("克隆失败，请稍后重试");
+    }
   };
 
   return (
@@ -369,6 +388,12 @@ function DashboardContent() {
                                     className="h-7 px-2 text-xs"
                                     onClick={() => router.push(`/admin/tasks/${task.id}`)}
                                   >详情</Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2 text-xs"
+                                    onClick={() => handleCloneTask(task.id)}
+                                  >克隆</Button>
                                   <Button
                                     size="sm"
                                     variant="ghost"

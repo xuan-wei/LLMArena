@@ -50,6 +50,29 @@ export async function PUT(
       adminEnableThinking, adminThinkingBudget, adminTemperature, adminMaxTokens,
     } = await request.json();
 
+    const adminLLMFields =
+      adminLLMEnabled === false
+        ? {
+            adminLLMEnabled: false,
+            adminStudentLLMConfigId: null,
+            adminModel: null,
+            adminPrompt: null,
+            adminEnableThinking: false,
+            adminThinkingBudget: null,
+            adminTemperature: null,
+            adminMaxTokens: null,
+          }
+        : {
+            ...(adminLLMEnabled !== undefined && { adminLLMEnabled }),
+            ...(adminStudentLLMConfigId !== undefined && { adminStudentLLMConfigId: adminStudentLLMConfigId || null }),
+            ...(adminModel !== undefined && { adminModel: adminModel || null }),
+            ...(adminPrompt !== undefined && { adminPrompt: adminPrompt || null }),
+            ...(adminEnableThinking !== undefined && { adminEnableThinking }),
+            ...(adminThinkingBudget !== undefined && { adminThinkingBudget: adminThinkingBudget != null ? Number(adminThinkingBudget) : null }),
+            ...(adminTemperature !== undefined && { adminTemperature: adminTemperature != null ? Number(adminTemperature) : null }),
+            ...(adminMaxTokens !== undefined && { adminMaxTokens: adminMaxTokens != null ? Number(adminMaxTokens) : null }),
+          };
+
     const task = await prisma.task.update({
       where: { id },
       data: {
@@ -60,14 +83,7 @@ export async function PUT(
         ...(maxFinalSubs !== undefined && { maxFinalSubs }),
         ...(topNForFinals !== undefined && { topNForFinals }),
         ...(maxTrialRuns !== undefined && { maxTrialRuns }),
-        ...(adminLLMEnabled !== undefined && { adminLLMEnabled }),
-        ...(adminStudentLLMConfigId !== undefined && { adminStudentLLMConfigId: adminStudentLLMConfigId || null }),
-        ...(adminModel !== undefined && { adminModel: adminModel || null }),
-        ...(adminPrompt !== undefined && { adminPrompt: adminPrompt || null }),
-        ...(adminEnableThinking !== undefined && { adminEnableThinking }),
-        ...(adminThinkingBudget !== undefined && { adminThinkingBudget: adminThinkingBudget != null ? Number(adminThinkingBudget) : null }),
-        ...(adminTemperature !== undefined && { adminTemperature: adminTemperature != null ? Number(adminTemperature) : null }),
-        ...(adminMaxTokens !== undefined && { adminMaxTokens: adminMaxTokens != null ? Number(adminMaxTokens) : null }),
+        ...adminLLMFields,
       },
     });
 
@@ -87,6 +103,16 @@ export async function DELETE(
   const check = await getTaskOrForbid(id, user);
   if (check.error) return check.error;
 
-  await prisma.task.delete({ where: { id } });
-  return NextResponse.json({ ok: true });
+  try {
+    await prisma.$transaction([
+      prisma.answer.deleteMany({ where: { submission: { taskId: id } } }),
+      prisma.submission.deleteMany({ where: { taskId: id } }),
+      prisma.enrollment.deleteMany({ where: { taskId: id } }),
+      prisma.task.delete({ where: { id } }),
+    ]);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Delete task error:", error);
+    return NextResponse.json({ error: "删除活动失败" }, { status: 500 });
+  }
 }

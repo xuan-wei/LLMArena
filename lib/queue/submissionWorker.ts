@@ -170,23 +170,14 @@ export async function runSubmissionWorker(
   type QResult = { output: string; thinking: string; rawInput: string; genError: string | null; score: number | null; reason: string | null };
   const results: (QResult | undefined)[] = new Array(questions.length);
   let completedCount = 0;
-  let genFailCount = 0;
-  let judgeFailCount = 0;
-  let abortEarly = false;
-  const genAbortThreshold = Math.min(2, questions.length);
-  const judgeAbortThreshold = Math.min(3, questions.length);
 
   await Promise.allSettled(
     questions.map(async (q, i) => {
       // Yield to the event loop so other callbacks (including HTTP) can run.
       await new Promise<void>((r) => setImmediate(r));
 
-      if (abortEarly) return;
-
       // Step 1: generate
       await llmSemaphore.acquire(llmKey);
-      // Re-check after acquiring — other questions may have triggered abort while we waited.
-      if (abortEarly) { llmSemaphore.release(llmKey); return; }
       onProgress({ currentQuestion: q.content.slice(0, 50) });
       let output = "", thinking = "", rawInput = "", genError: string | null = null;
       try {
@@ -204,32 +195,21 @@ export async function runSubmissionWorker(
         llmSemaphore.release(llmKey);
       }
 
-      if (genError) {
-        genFailCount++;
-        if (genFailCount >= genAbortThreshold) abortEarly = true;
-      }
-
       // Step 2: evaluate immediately after generation
       let score: number | null = null, reason: string | null = null;
-      if (!genError && !abortEarly) {
+      if (!genError) {
         await new Promise<void>((r) => setImmediate(r));
         await llmSemaphore.acquire(judgeKey);
-        // Re-check after acquiring — other questions may have triggered abort while we waited.
-        if (abortEarly) { llmSemaphore.release(judgeKey); return; }
         try {
           const evalResult = await evaluateAnswer(output, q, submission.task);
           score = evalResult.score;
           reason = evalResult.reason ?? null;
-          if (score === null) {
-            judgeFailCount++;
-            if (judgeFailCount >= judgeAbortThreshold) abortEarly = true;
-          }
         } finally {
           llmSemaphore.release(judgeKey);
         }
       }
 
-      results[i] = { output, thinking, rawInput, genError, score, reason };
+      results[i] = { output, thinking, rawInput, genError, score: genError ? 0 : score, reason };
       completedCount++;
       onProgress({ completed: completedCount });
     })
@@ -239,7 +219,6 @@ export async function runSubmissionWorker(
 
   const completedResults = results.filter((r): r is QResult => r !== undefined);
   const allGenFailed = completedResults.length > 0 && completedResults.every((r) => r.genError !== null);
-  const sysErr = allGenFailed || genFailCount >= genAbortThreshold || judgeFailCount >= judgeAbortThreshold;
 
   await prisma.answer.createMany({
     data: questions.flatMap((q, i) => {
@@ -250,33 +229,38 @@ export async function runSubmissionWorker(
         questionId: q.id,
         rawInput: r.rawInput || null,
         rawThinking: r.thinking || null,
-        rawOutput: r.output,
-        score: r.genError !== null ? null : r.score,
-        judgeReason: r.genError !== null ? `[调用失败] ${r.genError}` : (r.reason || null),
+        rawOutput: r.genError !== null ? `[调用失败] ${r.genError}` : r.output,
+        score: r.score,
+        judgeReason: r.genError !== null ? null : (r.reason || null),
       }];
     }),
   });
 
   const trainScores = questions.flatMap((q, i) => {
     const r = results[i];
-    if (!r || r.genError !== null || q.split !== "TRAIN" || r.score === null) return [];
+    if (!r || q.split !== "TRAIN" || r.score === null) return [];
     return [r.score];
   });
   const testScores = questions.flatMap((q, i) => {
     const r = results[i];
-    if (!r || r.genError !== null || q.split !== "TEST" || r.score === null) return [];
+    if (!r || q.split !== "TEST" || r.score === null) return [];
     return [r.score];
   });
   const avg = (arr: number[]) => arr.length === 0 ? 0 : arr.reduce((a, b) => a + b, 0) / arr.length;
   const trainAvg = avg(trainScores);
 
-  if (sysErr) {
-    const errMsg = genFailCount >= genAbortThreshold
-      ? (completedResults.find((r) => r.genError)?.genError ?? "LLM 调用失败")
-      : `LLM Judge 连续失败（${judgeFailCount} 次）`;
+  if (allGenFailed) {
+    const errMsg = completedResults.find((r) => r.genError)?.genError ?? "LLM 调用失败";
     await prisma.submission.update({
       where: { id: submissionId },
-      data: { status: "SYSERR", errorMessage: errMsg, completedAt: new Date() },
+      data: {
+        status: "SYSERR",
+        errorMessage: errMsg,
+        publicScore: trainAvg,
+        privateScore: testScores.length > 0 ? avg(testScores) : trainAvg,
+        finalScore: testScores.length > 0 ? avg(testScores) : trainAvg,
+        completedAt: new Date(),
+      },
     });
     return;
   }

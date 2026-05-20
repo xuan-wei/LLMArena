@@ -60,6 +60,7 @@ export default function SubmitPage({ params }: { params: Promise<{ id: string }>
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [publicQuestions, setPublicQuestions] = useState<PublicQuestion[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [validateDialog, setValidateDialog] = useState<{ open: boolean; status: "testing" | "success" | "fail"; message?: string }>({ open: false, status: "testing" });
   const [progressSubId, setProgressSubId] = useState<string | null>(null);
   const [progress, setProgress] = useState({ completed: 0, total: 0, currentQuestion: "" });
   const [progressDone, setProgressDone] = useState(false);
@@ -93,7 +94,22 @@ export default function SubmitPage({ params }: { params: Promise<{ id: string }>
 
   const handleSubmit = async () => {
     setSubmitting(true);
+    setValidateDialog({ open: true, status: "testing" });
     try {
+      const [valRes] = await Promise.all([
+        authFetch(`/api/tasks/${id}/enrollment/validate`, { method: "POST" }),
+        new Promise((r) => setTimeout(r, 2000)),
+      ]);
+      const valData = await (valRes as Response).json().catch(() => ({}));
+      if (!valData.ok) {
+        setValidateDialog({ open: true, status: "fail", message: valData.message || "无法连接到 Chatbot" });
+        return;
+      }
+
+      setValidateDialog({ open: true, status: "success" });
+      await new Promise((r) => setTimeout(r, 800));
+      setValidateDialog((v) => ({ ...v, open: false }));
+
       const res = await authFetch(`/api/tasks/${id}/submissions`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -101,6 +117,7 @@ export default function SubmitPage({ params }: { params: Promise<{ id: string }>
       startProgress(data.submission.id);
       toast.success("提交成功，正在评测...");
     } catch (error) {
+      setValidateDialog((v) => ({ ...v, open: false }));
       toast.error(error instanceof Error ? error.message : "提交失败");
     } finally {
       setSubmitting(false);
@@ -401,6 +418,37 @@ export default function SubmitPage({ params }: { params: Promise<{ id: string }>
                   );
                 })}
             </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={validateDialog.open} onOpenChange={(open) => {
+          if (!open && validateDialog.status === "fail") {
+            setValidateDialog({ open: false, status: "testing" });
+            setSubmitting(false);
+          }
+        }}>
+          <DialogContent className="max-w-sm text-center">
+            {validateDialog.status === "testing" && (
+              <div className="py-6 space-y-3">
+                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                <p className="text-sm font-medium">连通性测试中...</p>
+                <p className="text-xs text-muted-foreground">正在检测 Chatbot 是否可以正常响应</p>
+              </div>
+            )}
+            {validateDialog.status === "success" && (
+              <div className="py-6 space-y-3">
+                <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-green-100 text-green-600 text-lg">✓</div>
+                <p className="text-sm font-medium">连通性测试通过</p>
+              </div>
+            )}
+            {validateDialog.status === "fail" && (
+              <div className="py-6 space-y-3">
+                <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-red-600 text-lg">✗</div>
+                <p className="text-sm font-medium">连通性测试失败</p>
+                <p className="text-xs text-muted-foreground break-all">{validateDialog.message}</p>
+                <Button size="sm" variant="outline" onClick={() => { setValidateDialog({ open: false, status: "testing" }); setSubmitting(false); }}>关闭</Button>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </main>

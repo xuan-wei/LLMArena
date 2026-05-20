@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { toast } from "sonner";
+import { ConnectivityTestDialog } from "@/components/ConnectivityTestDialog";
 
 type Mode = "OPENAI_COMPATIBLE" | "DIFY" | "COZE";
 
@@ -32,6 +33,7 @@ export default function EnrollPage({ params }: { params: Promise<{ id: string }>
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [validating, setValidating] = useState(false);
+  const [testDialog, setTestDialog] = useState<{ open: boolean; status: "testing" | "success" | "fail"; message?: string; preview?: string }>({ open: false, status: "testing" });
 
   // Chatbot config form
   const [mode, setMode] = useState<Mode>("OPENAI_COMPATIBLE");
@@ -124,16 +126,21 @@ export default function EnrollPage({ params }: { params: Promise<{ id: string }>
 
   const handleValidate = async () => {
     setValidating(true);
+    setTestDialog({ open: true, status: "testing" });
     try {
-      const res = await authFetch(`/api/tasks/${id}/enrollment/validate`, { method: "POST" });
-      const data = await res.json();
+      const [res] = await Promise.all([
+        authFetch(`/api/tasks/${id}/enrollment/validate`, { method: "POST" }),
+        new Promise((r) => setTimeout(r, 2000)),
+      ]);
+      const data = await (res as Response).json();
       if (data.ok) {
-        toast.success(`连通性测试成功！预览: ${data.preview}`);
+        setTestDialog({ open: true, status: "success", preview: data.preview });
+        setTimeout(() => setTestDialog((v) => ({ ...v, open: false })), 2000);
       } else {
-        toast.error(`测试失败: ${data.message}`);
+        setTestDialog({ open: true, status: "fail", message: data.message || "连接失败" });
       }
     } catch {
-      toast.error("测试请求失败");
+      setTestDialog({ open: true, status: "fail", message: "测试请求失败" });
     } finally {
       setValidating(false);
     }
@@ -340,6 +347,13 @@ export default function EnrollPage({ params }: { params: Promise<{ id: string }>
           </Card>
         )}
       </main>
+      <ConnectivityTestDialog
+        open={testDialog.open}
+        status={testDialog.status}
+        message={testDialog.message}
+        preview={testDialog.preview}
+        onClose={() => setTestDialog({ open: false, status: "testing" })}
+      />
     </div>
   );
 }

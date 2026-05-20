@@ -14,6 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { toast } from "sonner";
+import { SysErrTooltip, classifyError, stripTechnicalDetails } from "@/components/SysErrTooltip";
+import { getScoreColors } from "@/lib/scoreColors";
 
 interface LLMConfig {
   id: string;
@@ -67,6 +69,7 @@ interface Submission {
   id: string;
   phase: string;
   status: string;
+  errorMessage: string | null;
   publicScore: number | null;
   finalScore: number | null;
   createdAt: string;
@@ -122,8 +125,6 @@ const MODE_LABELS: Record<string, string> = {
   DIFY: "Dify",
   COZE: "Coze",
 };
-
-import { getScoreColors } from "@/lib/scoreColors";
 
 export default function AdminTaskPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -878,9 +879,13 @@ export default function AdminTaskPage({ params }: { params: Promise<{ id: string
                             <Badge variant="outline">{s.phase === "FINALS" ? "终赛" : "海选"}</Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={s.status === "FAILED" ? "destructive" : s.status === "COMPLETED" ? "secondary" : "outline"}>
-                              {s.status === "COMPLETED" ? "完成" : s.status === "FAILED" ? "失败" : s.status === "SYSERR" ? "系统错误" : s.status === "RUNNING" ? "运行中" : "等待"}
-                            </Badge>
+                            {s.status === "SYSERR" ? (
+                              <SysErrTooltip subId={s.id} authFetch={authFetch} errorMessage={s.errorMessage} />
+                            ) : (
+                              <Badge variant={s.status === "FAILED" ? "destructive" : s.status === "COMPLETED" ? "secondary" : "outline"}>
+                                {s.status === "COMPLETED" ? "完成" : s.status === "FAILED" ? "失败" : s.status === "RUNNING" ? "运行中" : "等待"}
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm">
                             {s.publicScore != null ? `${(s.publicScore * 100).toFixed(1)}%` : "—"}
@@ -894,7 +899,7 @@ export default function AdminTaskPage({ params }: { params: Promise<{ id: string
                           <TableCell>
                             <div className="flex gap-1">
                               <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => viewSubmissionDetail(s.id)}>详情</Button>
-                              {s.status === "FAILED" && (
+                              {(s.status === "FAILED" || s.status === "SYSERR") && (
                                 <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => retrySubmission(s.id)}>重跑</Button>
                               )}
                               <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => deleteSubmission(s.id)}>删除</Button>
@@ -997,7 +1002,19 @@ export default function AdminTaskPage({ params }: { params: Promise<{ id: string
                       type="checkbox"
                       id="adminLLMEnabled"
                       checked={editForm.adminLLMEnabled}
-                      onChange={(e) => setEditForm({ ...editForm, adminLLMEnabled: e.target.checked })}
+                      onChange={(e) => setEditForm(e.target.checked
+                        ? { ...editForm, adminLLMEnabled: true }
+                        : {
+                            ...editForm,
+                            adminLLMEnabled: false,
+                            adminStudentLLMConfigId: "",
+                            adminModel: "",
+                            adminPrompt: "",
+                            adminEnableThinking: false,
+                            adminThinkingBudget: "",
+                            adminTemperature: "",
+                            adminMaxTokens: "",
+                          })}
                       className="h-4 w-4"
                     />
                     <Label htmlFor="adminLLMEnabled" className="cursor-pointer font-medium">
@@ -1359,6 +1376,9 @@ export default function AdminTaskPage({ params }: { params: Promise<{ id: string
             )}
             <div className="space-y-3">
               {detailSub?.answers?.map((ans) => {
+                const isGenErr = ans.rawOutput?.startsWith("[调用失败]");
+                const genErrMsg = isGenErr ? ans.rawOutput.replace(/^\[调用失败\]\s*/, "") : "";
+                const errCategory = isGenErr ? classifyError(genErrMsg) : null;
                 const colors = getScoreColors(ans.score);
                 return (
                 <div key={ans.id} className={`border border-l-4 rounded p-3 text-sm space-y-2 ${colors.border}`}>
@@ -1370,14 +1390,15 @@ export default function AdminTaskPage({ params }: { params: Promise<{ id: string
                     >
                       {ans.question.split === "TRAIN" ? "训练" : ans.question.split === "TEST" ? "测试" : "不使用"}
                     </Badge>
-                    {ans.score !== null && (
-                      <div className={`ml-auto px-2 py-0.5 rounded text-xs font-medium ${colors.badge}`}>
-                        {(ans.score * 100).toFixed(1)}%
-                      </div>
+                    {errCategory && (
+                      <Badge variant="outline" className={`text-[9px] px-1 py-0 ${errCategory.color}`}>{errCategory.label}</Badge>
                     )}
+                    <div className={`ml-auto px-2 py-0.5 rounded text-xs font-medium ${colors.badge}`}>
+                      {ans.score !== null ? `${(ans.score * 100).toFixed(1)}%` : "N/A"}
+                    </div>
                   </div>
                   <div className="text-sm font-medium">{ans.question.content}</div>
-                  {ans.rawInput && (
+                  {!isGenErr && ans.rawInput && (
                     <details className="text-xs">
                       <summary className="cursor-pointer text-muted-foreground hover:text-foreground select-none">
                         LLM 输入 ▸
@@ -1385,7 +1406,7 @@ export default function AdminTaskPage({ params }: { params: Promise<{ id: string
                       <pre className="mt-1 bg-muted rounded p-2 whitespace-pre-wrap font-mono overflow-x-auto max-h-48 overflow-y-auto">{ans.rawInput}</pre>
                     </details>
                   )}
-                  {ans.rawThinking && (
+                  {!isGenErr && ans.rawThinking && (
                     <details className="text-xs">
                       <summary className="cursor-pointer text-amber-700 hover:text-amber-900 select-none">
                         🧠 思考过程（Thinking）▸
@@ -1394,13 +1415,17 @@ export default function AdminTaskPage({ params }: { params: Promise<{ id: string
                     </details>
                   )}
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">LLM 输出</p>
-                    <div className="bg-muted rounded p-2 text-xs font-mono whitespace-pre-wrap max-h-40 overflow-y-auto">
-                      {ans.rawOutput || "(无输出)"}
+                    <p className="text-xs text-muted-foreground mb-1">{isGenErr ? "生成错误" : "LLM 输出"}</p>
+                    <div className={`rounded p-2 text-xs font-mono whitespace-pre-wrap max-h-40 overflow-y-auto ${isGenErr ? "bg-destructive/10 text-destructive" : "bg-muted"}`}>
+                      {isGenErr
+                        ? stripTechnicalDetails(genErrMsg)
+                        : (ans.rawOutput || "(无输出)")}
                     </div>
                   </div>
-                  {ans.judgeReason && (
-                    <div className="text-xs text-muted-foreground">评分理由: {ans.judgeReason}</div>
+                  {!isGenErr && ans.judgeReason && (
+                    <div className={`text-xs ${ans.score === null ? "text-amber-600" : "text-muted-foreground"}`}>
+                      {ans.score === null ? "评分器错误: " : "评分理由: "}{ans.judgeReason}
+                    </div>
                   )}
                 </div>
                 );

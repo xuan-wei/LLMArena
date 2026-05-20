@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { ConnectivityTestDialog } from "@/components/ConnectivityTestDialog";
 
 const OBJECTIVE_TEMPLATE = `你是一个严格的评判者。请根据题目和参考答案，判断学生答案是否正确。
 
@@ -65,6 +66,7 @@ export default function JudgeProfilesPage() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState<string | null>(null);
+  const [testDialog, setTestDialog] = useState<{ open: boolean; status: "testing" | "success" | "fail"; message?: string; preview?: string }>({ open: false, status: "testing" });
 
   useEffect(() => {
     if (!loading) {
@@ -159,16 +161,34 @@ export default function JudgeProfilesPage() {
 
   const test = async (profileId: string) => {
     setTesting(profileId);
+    setTestDialog({ open: true, status: "testing" });
     try {
-      await authFetch(`/api/admin/judge-profiles/${profileId}/test`, { method: "POST" });
+      const [res] = await Promise.all([
+        authFetch(`/api/admin/judge-profiles/${profileId}/test`, { method: "POST" }),
+        new Promise((r) => setTimeout(r, 2000)),
+      ]);
+      const data = await (res as Response).json();
       load();
+      if (data.ok) {
+        setTestDialog({ open: true, status: "success", preview: data.response?.slice(0, 200) });
+        setTimeout(() => setTestDialog((v) => ({ ...v, open: false })), 2000);
+      } else {
+        setTestDialog({ open: true, status: "fail", message: data.error || "测试失败" });
+      }
+    } catch {
+      setTestDialog({ open: true, status: "fail", message: "测试请求失败" });
     } finally {
       setTesting(null);
     }
   };
 
   const del = async (id: string) => {
-    await authFetch(`/api/admin/judge-profiles/${id}`, { method: "DELETE" });
+    if (!confirm("确定删除这个评分器吗？如果已有活动正在使用它，将无法删除。")) return;
+    const res = await authFetch(`/api/admin/judge-profiles/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      return toast.error(data.error || "删除失败");
+    }
     load();
     toast.success("已删除");
   };
@@ -430,6 +450,14 @@ export default function JudgeProfilesPage() {
           </DialogContent>
         </Dialog>
       </main>
+      <ConnectivityTestDialog
+        open={testDialog.open}
+        status={testDialog.status}
+        message={testDialog.message}
+        preview={testDialog.preview}
+        title="评分器连通性测试"
+        onClose={() => setTestDialog({ open: false, status: "testing" })}
+      />
     </div>
   );
 }

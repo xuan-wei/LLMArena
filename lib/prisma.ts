@@ -15,6 +15,6 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 if (isNew) {
   // WAL mode allows concurrent readers alongside the single writer, reducing lock contention.
   // busy_timeout makes SQLite wait up to 5 s instead of returning SQLITE_BUSY immediately.
-  void prisma.$executeRawUnsafe("PRAGMA journal_mode=WAL").catch(() => {});
-  void prisma.$executeRawUnsafe("PRAGMA busy_timeout=5000").catch(() => {});
+  void prisma.$queryRawUnsafe("PRAGMA journal_mode=WAL").catch(() => {});
+  void prisma.$queryRawUnsafe("PRAGMA busy_timeout=5000").catch(() => {});
 }

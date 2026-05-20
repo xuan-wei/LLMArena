@@ -54,6 +54,14 @@ export async function DELETE(
     return NextResponse.json({ error: "无权限" }, { status: 403 });
   }
 
+  const taskCount = await prisma.task.count({ where: { judgeProfileId: id } });
+  if (taskCount > 0) {
+    return NextResponse.json(
+      { error: `该评分器已被 ${taskCount} 个活动使用，无法删除` },
+      { status: 400 },
+    );
+  }
+
   await prisma.judgeProfile.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }

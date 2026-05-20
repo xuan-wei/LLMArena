@@ -65,12 +65,12 @@ export async function POST(request: Request) {
         topNForFinals: topNForFinals ?? 10,
         maxTrialRuns: maxTrialRuns ?? 15,
         adminLLMEnabled: adminLLMEnabled ?? false,
-        adminStudentLLMConfigId: adminStudentLLMConfigId || null,
-        adminModel: adminModel || null,
-        adminEnableThinking: adminEnableThinking ?? false,
-        adminThinkingBudget: adminThinkingBudget ?? null,
-        adminTemperature: adminTemperature ?? null,
-        adminMaxTokens: adminMaxTokens ?? null,
+        adminStudentLLMConfigId: adminLLMEnabled ? (adminStudentLLMConfigId || null) : null,
+        adminModel: adminLLMEnabled ? (adminModel || null) : null,
+        adminEnableThinking: adminLLMEnabled ? (adminEnableThinking ?? false) : false,
+        adminThinkingBudget: adminLLMEnabled ? (adminThinkingBudget ?? null) : null,
+        adminTemperature: adminLLMEnabled ? (adminTemperature ?? null) : null,
+        adminMaxTokens: adminLLMEnabled ? (adminMaxTokens ?? null) : null,
         createdBy: user.sub,
         ...(bankItems.length > 0 && {
           questions: {
