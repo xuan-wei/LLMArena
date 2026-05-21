@@ -53,7 +53,7 @@ const STATUS_BADGE: Record<string, { label: string; variant: "default" | "second
 
 export default function SubmitPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { user, loading, authFetch } = useAuth();
+  const { user, loading, authFetch, locale } = useAuth();
   const router = useRouter();
   const [task, setTask] = useState<{ title: string; status: string; maxPrelimSubs: number; maxFinalSubs: number } | null>(null);
   const [isFinalist, setIsFinalist] = useState<boolean | null>(null);
@@ -322,7 +322,7 @@ export default function SubmitPage({ params }: { params: Promise<{ id: string }>
                               {sub.publicScore !== null ? `${(sub.publicScore * 100).toFixed(1)}%` : "—"}
                             </TableCell>
                             <TableCell className="text-right text-sm text-muted-foreground">
-                              {new Date(sub.createdAt).toLocaleString("zh-CN")}
+                              {new Date(sub.createdAt).toLocaleString(locale)}
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-1 justify-end">

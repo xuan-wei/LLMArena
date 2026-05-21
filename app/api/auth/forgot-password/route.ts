@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendPasswordResetEmail } from "@/lib/email";
 import crypto from "crypto";
+import { normalizeLanguage } from "@/lib/i18n";
+import { st } from "@/lib/i18n/server";
 
 export async function POST(request: Request) {
-  const { email } = await request.json();
-  if (!email) return NextResponse.json({ error: "请填写邮箱" }, { status: 400 });
+  const { email, language } = await request.json();
+  const lang = normalizeLanguage(language);
+  if (!email) return NextResponse.json({ error: st(lang, "auth.emailRequired") }, { status: 400 });
 
   // Always return success to prevent email enumeration
   const user = await prisma.user.findUnique({ where: { email } });
@@ -16,7 +19,7 @@ export async function POST(request: Request) {
 
   if (!process.env.SMTP_HOST) {
     return NextResponse.json(
-      { error: "邮件服务未配置，请联系管理员" },
+      { error: lang === "zh" ? "邮件服务未配置，请联系管理员" : "Email service is not configured. Please contact the administrator." },
       { status: 503 },
     );
   }
@@ -39,7 +42,7 @@ export async function POST(request: Request) {
     : "http://localhost:3000";
 
   const resetLink = `${origin}/reset-password?token=${token}`;
-  await sendPasswordResetEmail(user.email, user.name, resetLink);
+  await sendPasswordResetEmail(user.email, user.name, resetLink, user.language);
 
   return NextResponse.json({ ok: true });
 }

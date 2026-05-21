@@ -2,15 +2,20 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser } from "@/lib/auth";
 import { callChatbot, type ChatbotConfig } from "@/lib/chatbot";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
-const PROBE_QUESTION = "Hi, please respond \"OK\".";
+const PROBE_QUESTIONS = {
+  zh: '你好，请只回复 "OK"。',
+  en: 'Hi, please respond only with "OK".',
+};
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = getUser(request);
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  const lang = await getRequestLanguage(request);
+  if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
 
   const { id } = await params;
   const enrollment = await prisma.enrollment.findUnique({
@@ -20,14 +25,14 @@ export async function POST(
       task: { include: { adminStudentLLMConfig: true } },
     },
   });
-  if (!enrollment) return NextResponse.json({ ok: false, message: "尚未报名" });
+  if (!enrollment) return NextResponse.json({ ok: false, message: st(lang, "api.validateNotEnrolled") });
 
   let chatbotConfig: ChatbotConfig;
 
   if (enrollment.task.adminLLMEnabled) {
     const cfg = enrollment.task.adminStudentLLMConfig;
     if (!cfg || !cfg.apiBaseUrl || !cfg.apiKey) {
-      return NextResponse.json({ ok: false, message: "管理员尚未完成 LLM 配置" });
+      return NextResponse.json({ ok: false, message: st(lang, "api.adminLLMIncomplete") });
     }
     chatbotConfig = {
       mode: "OPENAI_COMPATIBLE",
@@ -42,7 +47,7 @@ export async function POST(
   } else if (enrollment.mode === "OPENAI_COMPATIBLE") {
     const cfg = enrollment.studentLLMConfig;
     if (!cfg || !cfg.apiBaseUrl || !cfg.apiKey) {
-      return NextResponse.json({ ok: false, message: "未选择 LLM 账号或账号缺少凭据" });
+      return NextResponse.json({ ok: false, message: st(lang, "api.selectLLMAccount") });
     }
     chatbotConfig = {
       mode: "OPENAI_COMPATIBLE",
@@ -56,21 +61,22 @@ export async function POST(
     };
   } else if (enrollment.mode === "DIFY") {
     if (!enrollment.difyEndpoint || !enrollment.difyApiKey) {
-      return NextResponse.json({ ok: false, message: "Dify 配置不完整" });
+      return NextResponse.json({ ok: false, message: st(lang, "api.difyIncomplete") });
     }
     chatbotConfig = { mode: "DIFY", difyEndpoint: enrollment.difyEndpoint, difyApiKey: enrollment.difyApiKey };
   } else {
     if (!enrollment.cozeEndpoint || !enrollment.cozeApiKey || !enrollment.cozeBotId) {
-      return NextResponse.json({ ok: false, message: "Coze 配置不完整" });
+      return NextResponse.json({ ok: false, message: st(lang, "api.cozeIncomplete") });
     }
     chatbotConfig = { mode: "COZE", cozeEndpoint: enrollment.cozeEndpoint, cozeApiKey: enrollment.cozeApiKey, cozeBotId: enrollment.cozeBotId };
   }
 
   try {
-    const { output: response } = await callChatbot(chatbotConfig, PROBE_QUESTION, 30000);
-    if (!response || response.trim().length === 0) return NextResponse.json({ ok: false, message: "Chatbot 返回了空响应" });
+    const { output: response } = await callChatbot(chatbotConfig, PROBE_QUESTIONS[lang], 30000);
+    if (!response || response.trim().length === 0) return NextResponse.json({ ok: false, message: st(lang, "api.emptyChatbotResponse") });
+
     return NextResponse.json({ ok: true, preview: response.slice(0, 200) });
   } catch (error) {
-    return NextResponse.json({ ok: false, message: error instanceof Error ? error.message : "连接失败" });
+    return NextResponse.json({ ok: false, message: error instanceof Error ? error.message : st(lang, "api.connectionFailed") });
   }
 }

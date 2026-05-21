@@ -32,6 +32,7 @@ const PAGE_SIZE = 10;
 export default function AccountConfigPage() {
   const { user, loading, authFetch } = useAuth();
   const router = useRouter();
+  const language = user?.language === "en" ? "en" : "zh";
   const [configs, setConfigs] = useState<LLMConfig[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState<string | null>(null);
@@ -236,7 +237,7 @@ export default function AccountConfigPage() {
         <Dialog open={!!detailConfig} onOpenChange={(o) => { if (!o) setDetailConfig(null); }}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>模型连通性测试 — {detailConfig?.name}</DialogTitle>
+              <DialogTitle>{language === "en" ? "Model Connectivity Test" : "模型连通性测试"} — {detailConfig?.name}</DialogTitle>
             </DialogHeader>
             {detailConfig && (() => {
               const modelList = detailConfig.models.split(",").map((m) => m.trim()).filter(Boolean);
@@ -310,7 +311,7 @@ export default function AccountConfigPage() {
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{editId ? "编辑" : "添加"} LLM 账号</DialogTitle>
+              <DialogTitle>{language === "en" ? `${editId ? "Edit" : "Add"} LLM Account` : `${editId ? "编辑" : "添加"} LLM 账号`}</DialogTitle>
             </DialogHeader>
             <div className="space-y-3 pt-1">
               <div className="space-y-1.5">

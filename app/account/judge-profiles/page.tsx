@@ -14,23 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { toast } from "sonner";
 import { ConnectivityTestDialog } from "@/components/ConnectivityTestDialog";
 
-const OBJECTIVE_TEMPLATE = `你是一个严格的评判者。请根据题目和参考答案，判断学生答案是否正确。
-
-题目：{{question}}
-参考答案：{{expected}}
-学生答案：{{output}}
-
-如果学生答案正确（意思相同即可，不要求字面完全一致），返回 1；否则返回 0。
-只返回一个 JSON 对象，格式为：{"score": 0或1, "reason": "简要说明"}`;
-
-const SUBJECTIVE_TEMPLATE = `你是一个公正的评分者。请根据题目和参考答案（如有），对学生回答的质量进行评分。
-
-题目：{{question}}
-参考答案：{{expected}}（如为"无"则为开放题，请根据质量评分）
-学生答案：{{output}}
-
-请给出 0 到 1 之间的分数，反映回答的准确性、完整性和表达质量。
-只返回一个 JSON 对象，格式为：{"score": 0到1的小数, "reason": "评分理由"}`;
+import { objectiveTemplate, subjectiveTemplate } from "@/lib/i18n/templates";
+import type { Language } from "@/lib/i18n";
 
 interface LLMOption { id: string; name: string; models: string }
 interface JudgeProfile {
@@ -52,7 +37,7 @@ interface JudgeProfile {
   lastTestMessage: string | null;
 }
 
-const emptyForm = { name: "", llmConfigId: "", studentLLMConfigId: "", model: "", type: "SUBJECTIVE", systemPrompt: SUBJECTIVE_TEMPLATE, enableThinking: true, thinkingBudget: "", temperature: "", maxTokens: "" };
+const makeEmptyForm = (language: Language) => ({ name: "", llmConfigId: "", studentLLMConfigId: "", model: "", type: "SUBJECTIVE", systemPrompt: subjectiveTemplate(language), enableThinking: true, thinkingBudget: "", temperature: "", maxTokens: "" });
 const PAGE_SIZE = 10;
 
 type StartOption = "blank" | "subjective" | "objective";
@@ -60,9 +45,13 @@ type StartOption = "blank" | "subjective" | "objective";
 export default function JudgeProfilesPage() {
   const { user, loading, authFetch } = useAuth();
   const router = useRouter();
+  const language: Language = user?.language === "en" ? "en" : "zh";
+  const objectivePrompt = objectiveTemplate(language);
+  const subjectivePrompt = subjectiveTemplate(language);
+  const allDefaultPrompts = [objectiveTemplate("zh"), subjectiveTemplate("zh"), objectiveTemplate("en"), subjectiveTemplate("en")];
   const [profiles, setProfiles] = useState<JudgeProfile[]>([]);
   const [llmOptions, setLLMOptions] = useState<LLMOption[]>([]);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(makeEmptyForm("zh"));
   const [editId, setEditId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -98,16 +87,21 @@ export default function JudgeProfilesPage() {
 
   const totalPages = Math.ceil(profiles.length / PAGE_SIZE);
   const pagedProfiles = profiles.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const displayTestMessage = (message: string) =>
+    language === "en" && /[\u4e00-\u9fff]/.test(message)
+      ? "Previous response was generated in another language. Run the test again to refresh it."
+      : message;
 
   const openPicker = () => setPickerOpen(true);
 
   const openNew = (startFrom: StartOption = "blank") => {
     setPickerOpen(false);
     setEditId(null);
+    const emptyForm = makeEmptyForm(language);
     if (startFrom === "subjective") {
-      setForm({ ...emptyForm, name: "主观题评分器", type: "SUBJECTIVE", systemPrompt: SUBJECTIVE_TEMPLATE });
+      setForm({ ...emptyForm, name: language === "en" ? "Subjective judge" : "主观题评分器", type: "SUBJECTIVE", systemPrompt: subjectivePrompt });
     } else if (startFrom === "objective") {
-      setForm({ ...emptyForm, name: "客观题评分器", type: "OBJECTIVE", systemPrompt: OBJECTIVE_TEMPLATE });
+      setForm({ ...emptyForm, name: language === "en" ? "Objective judge" : "客观题评分器", type: "OBJECTIVE", systemPrompt: objectivePrompt });
     } else {
       setForm(emptyForm);
     }
@@ -122,7 +116,7 @@ export default function JudgeProfilesPage() {
       studentLLMConfigId: p.studentLLMConfigId || "",
       model: p.model || "",
       type: p.type,
-      systemPrompt: p.systemPrompt,
+      systemPrompt: allDefaultPrompts.includes(p.systemPrompt) ? (p.type === "OBJECTIVE" ? objectivePrompt : subjectivePrompt) : p.systemPrompt,
       enableThinking: p.enableThinking,
       thinkingBudget: p.thinkingBudget != null ? String(p.thinkingBudget) : "",
       temperature: p.temperature != null ? String(p.temperature) : "",
@@ -133,8 +127,8 @@ export default function JudgeProfilesPage() {
 
   const handleTypeChange = (newType: string | null) => {
     if (!newType) return;
-    const defaultPrompt = newType === "OBJECTIVE" ? OBJECTIVE_TEMPLATE : SUBJECTIVE_TEMPLATE;
-    const isDefault = form.systemPrompt === OBJECTIVE_TEMPLATE || form.systemPrompt === SUBJECTIVE_TEMPLATE;
+    const defaultPrompt = newType === "OBJECTIVE" ? objectivePrompt : subjectivePrompt;
+    const isDefault = allDefaultPrompts.includes(form.systemPrompt);
     setForm({ ...form, type: newType, systemPrompt: isDefault ? defaultPrompt : form.systemPrompt });
   };
 
@@ -262,9 +256,9 @@ export default function JudgeProfilesPage() {
                           {p.lastTestMessage && (
                             <span
                               className={`text-xs font-mono truncate block cursor-default ${testFailed ? "text-destructive" : "text-muted-foreground"}`}
-                              title={p.lastTestMessage}
+                              title={displayTestMessage(p.lastTestMessage)}
                             >
-                              {p.lastTestMessage}
+                              {displayTestMessage(p.lastTestMessage)}
                             </span>
                           )}
                         </TableCell>
@@ -303,7 +297,7 @@ export default function JudgeProfilesPage() {
         <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
           <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>新建评分器 — 选择起点</DialogTitle>
+              <DialogTitle>{language === "en" ? "New judge profile - choose a starting point" : "新建评分器 — 选择起点"}</DialogTitle>
             </DialogHeader>
             <div className="grid grid-cols-3 gap-3 pt-2">
               {([
@@ -328,7 +322,7 @@ export default function JudgeProfilesPage() {
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{editId ? "编辑" : "新建"}评分器</DialogTitle>
+              <DialogTitle>{language === "en" ? `${editId ? "Edit" : "New"} judge profile` : `${editId ? "编辑" : "新建"}评分器`}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-2">
               <div className="space-y-1.5">
@@ -466,11 +460,11 @@ export default function JudgeProfilesPage() {
                   <Label>评分提示词</Label>
                   <div className="flex gap-2">
                     <Button type="button" variant="ghost" size="sm" className="text-xs h-7"
-                      onClick={() => setForm({ ...form, systemPrompt: OBJECTIVE_TEMPLATE, type: "OBJECTIVE" })}>
+                      onClick={() => setForm({ ...form, systemPrompt: objectivePrompt, type: "OBJECTIVE" })}>
                       用客观题模板
                     </Button>
                     <Button type="button" variant="ghost" size="sm" className="text-xs h-7"
-                      onClick={() => setForm({ ...form, systemPrompt: SUBJECTIVE_TEMPLATE, type: "SUBJECTIVE" })}>
+                      onClick={() => setForm({ ...form, systemPrompt: subjectivePrompt, type: "SUBJECTIVE" })}>
                       用主观题模板
                     </Button>
                   </div>

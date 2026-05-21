@@ -100,11 +100,11 @@ export async function upsertSSOUser(
   name: string,
   institution: string,
   institutionId?: string,
-): Promise<{ id: string; email: string; name: string | null; role: string; canPublish: boolean }> {
+): Promise<{ id: string; email: string; name: string | null; role: string; canPublish: boolean; language: string }> {
   let user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
     user = await prisma.user.create({
-      data: { email, name, passwordHash: null, institution, institutionId: institutionId ?? null },
+      data: { email, name, passwordHash: null, institution, institutionId: institutionId ?? null, language: "zh" },
     });
   } else {
     // Keep institution fields up to date (e.g. student ID may change on re-login)

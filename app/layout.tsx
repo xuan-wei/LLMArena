@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { Toaster } from "@/components/ui/sonner";
 import { Footer } from "@/components/layout/Footer";
+import { I18nClient } from "@/components/I18nClient";
 
 const geist = Geist({
   variable: "--font-geist",
@@ -11,8 +12,8 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Arena — 大模型竞技场",
-  description: "大模型 Chatbot 竞技场系统",
+  title: "Arena — LLM Arena",
+  description: "LLM Chatbot contest platform",
 };
 
 export default function RootLayout({
@@ -31,6 +32,7 @@ export default function RootLayout({
               icp={process.env.FOOTER_ICP}
             />
           </div>
+          <I18nClient />
           <Toaster />
         </AuthProvider>
       </body>

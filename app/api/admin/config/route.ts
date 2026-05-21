@@ -8,6 +8,8 @@ const ALLOWED_KEYS = [
   "SYSTEM_LLM_MODEL",
   "ALLOWED_MODELS",
   "welcome_email_enabled",
+  "publisher_application_email_enabled",
+  "publisher_application_email_recipients",
 ];
 
 export async function GET(request: Request) {

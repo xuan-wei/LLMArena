@@ -128,7 +128,7 @@ const MODE_LABELS: Record<string, string> = {
 
 export default function AdminTaskPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { user, loading, authFetch } = useAuth();
+  const { user, loading, authFetch, locale } = useAuth();
   const router = useRouter();
   const [task, setTask] = useState<Task | null>(null);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
@@ -894,7 +894,7 @@ export default function AdminTaskPage({ params }: { params: Promise<{ id: string
                             {s.finalScore != null ? `${(s.finalScore * 100).toFixed(1)}%` : "—"}
                           </TableCell>
                           <TableCell className="text-right text-sm text-muted-foreground">
-                            {new Date(s.createdAt).toLocaleString("zh-CN")}
+                            {new Date(s.createdAt).toLocaleString(locale)}
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1">
@@ -1474,6 +1474,7 @@ function LeaderboardTab({
   authFetch: (url: string, opts?: RequestInit) => Promise<Response>;
   refreshKey: number;
 }) {
+  const { locale } = useAuth();
   const [rows, setRows] = useState<LeaderboardRow[]>([]);
   const [phase, setPhase] = useState<"PRELIMINARY" | "FINALS">("PRELIMINARY");
   const [sortBy, setSortBy] = useState<"publicScore" | "privateScore">("publicScore");
@@ -1545,7 +1546,7 @@ function LeaderboardTab({
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground">{e.submissionCount}</TableCell>
                   <TableCell className="text-right text-xs text-muted-foreground">
-                    {new Date(e.submittedAt).toLocaleString("zh-CN")}
+                    {new Date(e.submittedAt).toLocaleString(locale)}
                   </TableCell>
                 </TableRow>
               ))}

@@ -2,8 +2,8 @@ import type { SSOProviderImpl } from "../index";
 
 const provider: SSOProviderImpl = {
   id: "jaccount",
-  name: "上海交通大学 jAccount",
-  shortName: "上海交通大学 jAccount",
+  name: "SJTU jAccount",
+  shortName: "SJTU jAccount",
 
   isEnabled() {
     return !!(process.env.JACCOUNT_CLIENT_ID && process.env.JACCOUNT_CLIENT_SECRET);

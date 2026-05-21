@@ -14,23 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { toast } from "sonner";
 import { ConnectivityTestDialog } from "@/components/ConnectivityTestDialog";
 
-const OBJECTIVE_TEMPLATE = `你是一个严格的评判者。请根据题目和参考答案，判断学生答案是否正确。
-
-题目：{{question}}
-参考答案：{{expected}}
-学生答案：{{output}}
-
-如果学生答案正确（意思相同即可，不要求字面完全一致），返回 1；否则返回 0。
-只返回一个 JSON 对象，格式为：{"score": 0或1, "reason": "简要说明"}`;
-
-const SUBJECTIVE_TEMPLATE = `你是一个公正的评分者。请根据题目和参考答案（如有），对学生回答的质量进行评分。
-
-题目：{{question}}
-参考答案：{{expected}}（如为"无"则为开放题，请根据质量评分）
-学生答案：{{output}}
-
-请给出 0 到 1 之间的分数，反映回答的准确性、完整性和表达质量。
-只返回一个 JSON 对象，格式为：{"score": 0到1的小数, "reason": "评分理由"}`;
+import { objectiveTemplate, subjectiveTemplate } from "@/lib/i18n/templates";
+import type { Language } from "@/lib/i18n";
 
 // Admin uses LLMConfig; non-admin uses StudentLLMConfig
 interface LLMOption { id: string; name: string; models: string }
@@ -53,15 +38,19 @@ interface JudgeProfile {
   lastTestMessage: string | null;
 }
 
-const emptyForm = { name: "", llmConfigId: "", studentLLMConfigId: "", model: "", type: "SUBJECTIVE", systemPrompt: SUBJECTIVE_TEMPLATE, enableThinking: true, thinkingBudget: "", temperature: "", maxTokens: "" };
+const makeEmptyForm = (language: Language) => ({ name: "", llmConfigId: "", studentLLMConfigId: "", model: "", type: "SUBJECTIVE", systemPrompt: subjectiveTemplate(language), enableThinking: true, thinkingBudget: "", temperature: "", maxTokens: "" });
 
 export default function JudgeProfilesPage() {
-  const { user, loading, authFetch } = useAuth();
+  const { user, loading, authFetch, locale } = useAuth();
   const router = useRouter();
   const isAdmin = user?.role === "ADMIN";
+  const language: Language = user?.language === "en" ? "en" : "zh";
+  const objectivePrompt = objectiveTemplate(language);
+  const subjectivePrompt = subjectiveTemplate(language);
+  const allDefaultPrompts = [objectiveTemplate("zh"), subjectiveTemplate("zh"), objectiveTemplate("en"), subjectiveTemplate("en")];
   const [profiles, setProfiles] = useState<JudgeProfile[]>([]);
   const [llmOptions, setLLMOptions] = useState<LLMOption[]>([]);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(makeEmptyForm("zh"));
   const [editId, setEditId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -99,7 +88,7 @@ export default function JudgeProfilesPage() {
 
   const openNew = () => {
     setEditId(null);
-    setForm(emptyForm);
+    setForm(makeEmptyForm(language));
     setOpen(true);
   };
 
@@ -111,7 +100,7 @@ export default function JudgeProfilesPage() {
       studentLLMConfigId: p.studentLLMConfigId || "",
       model: p.model || "",
       type: p.type,
-      systemPrompt: p.systemPrompt,
+      systemPrompt: allDefaultPrompts.includes(p.systemPrompt) ? (p.type === "OBJECTIVE" ? objectivePrompt : subjectivePrompt) : p.systemPrompt,
       enableThinking: p.enableThinking,
       thinkingBudget: p.thinkingBudget != null ? String(p.thinkingBudget) : "",
       temperature: p.temperature != null ? String(p.temperature) : "",
@@ -122,8 +111,8 @@ export default function JudgeProfilesPage() {
 
   const handleTypeChange = (newType: string | null) => {
     if (!newType) return;
-    const defaultPrompt = newType === "OBJECTIVE" ? OBJECTIVE_TEMPLATE : SUBJECTIVE_TEMPLATE;
-    const isDefault = form.systemPrompt === OBJECTIVE_TEMPLATE || form.systemPrompt === SUBJECTIVE_TEMPLATE;
+    const defaultPrompt = newType === "OBJECTIVE" ? objectivePrompt : subjectivePrompt;
+    const isDefault = allDefaultPrompts.includes(form.systemPrompt);
     setForm({ ...form, type: newType, systemPrompt: isDefault ? defaultPrompt : form.systemPrompt });
   };
 
@@ -196,6 +185,10 @@ export default function JudgeProfilesPage() {
   // Display name for the LLM in a profile card
   const profileLLMName = (p: JudgeProfile) =>
     p.llmConfig?.name ?? p.studentLLMConfig?.name ?? "未配置 LLM";
+  const displayTestMessage = (message: string) =>
+    language === "en" && /[\u4e00-\u9fff]/.test(message)
+      ? "Previous response was generated in another language. Run the test again to refresh it."
+      : message;
 
   if (loading) return <div><Navbar /></div>;
 
@@ -246,18 +239,18 @@ export default function JudgeProfilesPage() {
                         {testOk && (
                           <div className="text-xs text-green-700">
                             <span className="font-medium">✓ 测试通过</span>
-                            {p.lastTestedAt && <span className="text-muted-foreground ml-1">{new Date(p.lastTestedAt).toLocaleString("zh-CN")}</span>}
+                            {p.lastTestedAt && <span className="text-muted-foreground ml-1">{new Date(p.lastTestedAt).toLocaleString(locale)}</span>}
                             {p.lastTestMessage && (
-                              <div title={p.lastTestMessage} className="text-muted-foreground bg-muted rounded p-1.5 font-mono text-[11px] mt-1 max-w-sm truncate">{p.lastTestMessage}</div>
+                              <div title={displayTestMessage(p.lastTestMessage)} className="text-muted-foreground bg-muted rounded p-1.5 font-mono text-[11px] mt-1 max-w-sm truncate">{displayTestMessage(p.lastTestMessage)}</div>
                             )}
                           </div>
                         )}
                         {testFailed && (
                           <div className="text-xs text-destructive">
                             <span className="font-medium">✗ 测试失败</span>
-                            {p.lastTestedAt && <span className="text-muted-foreground ml-1">{new Date(p.lastTestedAt).toLocaleString("zh-CN")}</span>}
+                            {p.lastTestedAt && <span className="text-muted-foreground ml-1">{new Date(p.lastTestedAt).toLocaleString(locale)}</span>}
                             {p.lastTestMessage && (
-                              <div title={p.lastTestMessage} className="bg-red-50 rounded p-1.5 font-mono text-[11px] mt-1 max-w-sm truncate">{p.lastTestMessage}</div>
+                              <div title={displayTestMessage(p.lastTestMessage)} className="bg-red-50 rounded p-1.5 font-mono text-[11px] mt-1 max-w-sm truncate">{displayTestMessage(p.lastTestMessage)}</div>
                             )}
                           </div>
                         )}
@@ -285,7 +278,7 @@ export default function JudgeProfilesPage() {
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{editId ? "编辑" : "新建"}评分器</DialogTitle>
+              <DialogTitle>{language === "en" ? `${editId ? "Edit" : "New"} judge profile` : `${editId ? "编辑" : "新建"}评分器`}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-2">
               <div className="space-y-1.5">
@@ -423,11 +416,11 @@ export default function JudgeProfilesPage() {
                   <Label>评分提示词</Label>
                   <div className="flex gap-2">
                     <Button type="button" variant="ghost" size="sm" className="text-xs h-7"
-                      onClick={() => setForm({ ...form, systemPrompt: OBJECTIVE_TEMPLATE, type: "OBJECTIVE" })}>
+                      onClick={() => setForm({ ...form, systemPrompt: objectivePrompt, type: "OBJECTIVE" })}>
                       用客观题模板
                     </Button>
                     <Button type="button" variant="ghost" size="sm" className="text-xs h-7"
-                      onClick={() => setForm({ ...form, systemPrompt: SUBJECTIVE_TEMPLATE, type: "SUBJECTIVE" })}>
+                      onClick={() => setForm({ ...form, systemPrompt: subjectivePrompt, type: "SUBJECTIVE" })}>
                       用主观题模板
                     </Button>
                   </div>

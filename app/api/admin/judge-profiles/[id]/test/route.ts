@@ -2,19 +2,31 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser, getUserFresh } from "@/lib/auth";
 import { canPublishTasks, isAdmin } from "@/lib/permissions";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
+import { objectiveTemplate, subjectiveTemplate } from "@/lib/i18n/templates";
 import OpenAI from "openai";
 
-const TEST_QUESTION = "什么是大语言模型？";
-const TEST_EXPECTED = "基于 Transformer 架构、通过大规模语料预训练的语言模型";
-const TEST_OUTPUT = "大语言模型是一种基于深度学习的自然语言处理模型，参数量巨大，能够理解和生成人类语言。";
+const TEST_CASES = {
+  zh: {
+    question: "什么是大语言模型？",
+    expected: "基于 Transformer 架构、通过大规模语料预训练的语言模型",
+    output: "大语言模型是一种基于深度学习的自然语言处理模型，参数量巨大，能够理解和生成人类语言。",
+  },
+  en: {
+    question: "What is a large language model?",
+    expected: "A Transformer-based language model pretrained on large-scale corpora.",
+    output: "A large language model is a deep-learning model for natural language processing with many parameters that can understand and generate human language.",
+  },
+};
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await getUserFresh(request);
+  const lang = await getRequestLanguage(request);
   if (!canPublishTasks(user)) {
-    return NextResponse.json({ error: "无权限" }, { status: 403 });
+    return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
   }
 
   const { id } = await params;
@@ -22,11 +34,11 @@ export async function POST(
     where: { id },
     include: { llmConfig: true, studentLLMConfig: true },
   });
-  if (!profile) return NextResponse.json({ error: "不存在" }, { status: 404 });
+  if (!profile) return NextResponse.json({ error: st(lang, "api.notFound") }, { status: 404 });
 
   // Ownership check for non-admin
   if (!isAdmin(user) && profile.createdBy !== user.sub) {
-    return NextResponse.json({ error: "无权限" }, { status: 403 });
+    return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
   }
 
   // Resolve LLM credentials: admin config takes precedence, then student config
@@ -37,17 +49,25 @@ export async function POST(
     : null;
 
   if (!llmCreds || !profile.model) {
+    const msg = lang === "zh" ? "未配置 LLM 账号或模型" : "LLM account or model is not configured";
     await prisma.judgeProfile.update({
       where: { id },
-      data: { lastTestStatus: "failed", lastTestedAt: new Date(), lastTestMessage: "未配置 LLM 账号或模型" },
+      data: { lastTestStatus: "failed", lastTestedAt: new Date(), lastTestMessage: msg },
     });
-    return NextResponse.json({ ok: false, error: "未配置 LLM 账号或模型" });
+    return NextResponse.json({ ok: false, error: msg });
   }
 
-  const prompt = profile.systemPrompt
-    .replace("{{question}}", TEST_QUESTION)
-    .replace("{{expected}}", TEST_EXPECTED)
-    .replace("{{output}}", TEST_OUTPUT);
+  const defaultPrompts = [objectiveTemplate("zh"), subjectiveTemplate("zh"), objectiveTemplate("en"), subjectiveTemplate("en")];
+  const systemPrompt = defaultPrompts.includes(profile.systemPrompt)
+    ? profile.type === "OBJECTIVE"
+      ? objectiveTemplate(lang)
+      : subjectiveTemplate(lang)
+    : profile.systemPrompt;
+  const testCase = TEST_CASES[lang];
+  const prompt = systemPrompt
+    .replace("{{question}}", testCase.question)
+    .replace("{{expected}}", testCase.expected)
+    .replace("{{output}}", testCase.output);
 
   try {
     const client = new OpenAI({

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Bell, User, Settings, LogOut, ChevronDown,
+  Bell, User, Settings, LogOut, ChevronDown, Globe,
   Cpu, Gavel, Users, FileCheck, SlidersHorizontal, BookOpen, Library,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -53,6 +53,7 @@ function useHoverOpen() {
 
 function BellButton({ authFetch }: { authFetch: (url: string, opts?: RequestInit) => Promise<Response> }) {
   const router = useRouter();
+  const { t, locale } = useAuth();
   const [unread, setUnread] = useState(0);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const { open, setOpen, enter, leave } = useHoverOpen();
@@ -94,7 +95,7 @@ function BellButton({ authFetch }: { authFetch: (url: string, opts?: RequestInit
       <div onMouseEnter={enter} onMouseLeave={leave} className="relative">
         <PopoverTrigger
           className="relative inline-flex h-8 w-8 items-center justify-center rounded-full text-sm hover:bg-muted transition-colors"
-          aria-label="通知"
+          aria-label={t("nav.notifications")}
         >
           <Bell className="h-4 w-4" />
           {unread > 0 && (
@@ -112,23 +113,23 @@ function BellButton({ authFetch }: { authFetch: (url: string, opts?: RequestInit
         onMouseLeave={leave}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b">
-          <span className="text-sm font-medium">通知</span>
+          <span className="text-sm font-medium">{t("nav.notifications")}</span>
           <div className="flex items-center gap-3">
             {unread > 0 && (
               <button onClick={markAllRead} className="text-xs text-primary hover:underline">
-                全部已读
+                {t("nav.markAllRead")}
               </button>
             )}
             {notifications.length > 0 && (
               <button onClick={clearAll} className="text-xs text-muted-foreground hover:text-destructive hover:underline">
-                清除全部
+                {t("nav.clearAll")}
               </button>
             )}
           </div>
         </div>
         <div className="max-h-80 overflow-y-auto divide-y">
           {notifications.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">暂无通知</p>
+            <p className="text-sm text-muted-foreground text-center py-6">{t("nav.noNotifications")}</p>
           ) : (
             notifications.map((n) => (
               <button
@@ -149,7 +150,7 @@ function BellButton({ authFetch }: { authFetch: (url: string, opts?: RequestInit
                     <p className="text-sm font-medium leading-tight">{n.title}</p>
                     <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{n.body}</p>
                     <p className="text-xs text-muted-foreground/60 mt-1">
-                      {new Date(n.createdAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      {new Date(n.createdAt).toLocaleString(locale, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </p>
                   </div>
                 </div>
@@ -176,7 +177,7 @@ function NavDropdownItem({ href, icon: Icon, children }: { href: string; icon?: 
 }
 
 export function Navbar(_props: NavbarProps) {
-  const { user, logout, authFetch } = useAuth();
+  const { user, logout, authFetch, t, setLanguage } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const isAdmin = user?.role === "ADMIN";
@@ -210,7 +211,7 @@ export function Navbar(_props: NavbarProps) {
         <div className="flex items-center gap-1.5 min-w-0">
           <Link href="/dashboard" className="flex items-center gap-1.5 shrink-0">
             <span className="text-xl">🏆</span>
-            <span className="font-bold text-base tracking-tight">大模型竞技场</span>
+            <span className="font-bold text-base tracking-tight">{t("brand.name")}</span>
           </Link>
 
           {user && (
@@ -223,7 +224,7 @@ export function Navbar(_props: NavbarProps) {
                     isDashboard ? "font-medium text-foreground bg-muted" : "text-muted-foreground",
                   )}>
                     <BookOpen className="h-3.5 w-3.5" />
-                    活动广场
+                    {t("nav.dashboard")}
                     <ChevronDown className="h-3 w-3 opacity-60" />
                   </DropdownMenuTrigger>
                 </div>
@@ -233,8 +234,8 @@ export function Navbar(_props: NavbarProps) {
                   onMouseEnter={dashHover.enter}
                   onMouseLeave={dashHover.leave}
                 >
-                  <NavDropdownItem href="/dashboard">我订阅的</NavDropdownItem>
-                  <NavDropdownItem href="/dashboard?tab=mine">我发布的</NavDropdownItem>
+                  <NavDropdownItem href="/dashboard">{t("nav.subscribed")}</NavDropdownItem>
+                  <NavDropdownItem href="/dashboard?tab=mine">{t("nav.published")}</NavDropdownItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -247,7 +248,7 @@ export function Navbar(_props: NavbarProps) {
                       isAdminSection ? "font-medium text-foreground bg-muted" : "text-muted-foreground",
                     )}>
                       <SlidersHorizontal className="h-3.5 w-3.5" />
-                      管理控制台
+                      {t("nav.admin")}
                       <ChevronDown className="h-3 w-3 opacity-60" />
                     </DropdownMenuTrigger>
                   </div>
@@ -257,10 +258,10 @@ export function Navbar(_props: NavbarProps) {
                     onMouseEnter={adminHover.enter}
                     onMouseLeave={adminHover.leave}
                   >
-                    <NavDropdownItem href="/admin/users" icon={Users}>用户管理</NavDropdownItem>
-                    <NavDropdownItem href="/admin/publisher-applications" icon={FileCheck}>发布权限审批</NavDropdownItem>
-                    <NavDropdownItem href="/admin/question-banks" icon={Library}>样例题库管理</NavDropdownItem>
-                    <NavDropdownItem href="/admin/config" icon={SlidersHorizontal}>系统全局设置</NavDropdownItem>
+                    <NavDropdownItem href="/admin/users" icon={Users}>{t("nav.users")}</NavDropdownItem>
+                    <NavDropdownItem href="/admin/publisher-applications" icon={FileCheck}>{t("nav.publisherApplications")}</NavDropdownItem>
+                    <NavDropdownItem href="/admin/question-banks" icon={Library}>{t("nav.sampleQuestionBanks")}</NavDropdownItem>
+                    <NavDropdownItem href="/admin/config" icon={SlidersHorizontal}>{t("nav.systemConfig")}</NavDropdownItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
@@ -271,6 +272,13 @@ export function Navbar(_props: NavbarProps) {
         {/* Right: bell + user dropdown */}
         {user && (
           <div className="flex items-center gap-1 shrink-0">
+            <button
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-sm hover:bg-muted transition-colors text-muted-foreground"
+              aria-label="Switch language"
+              onClick={() => setLanguage(user.language === "zh" ? "en" : "zh").catch(() => {})}
+            >
+              <Globe className="h-4 w-4" />
+            </button>
             <BellButton authFetch={authFetch} />
 
             <DropdownMenu open={userHover.open} onOpenChange={userHover.setOpen}>
@@ -288,22 +296,22 @@ export function Navbar(_props: NavbarProps) {
                 onMouseLeave={userHover.leave}
               >
                 <DropdownMenuGroup>
-                  <NavDropdownItem href="/account/llm-config" icon={Cpu}>LLM 配置</NavDropdownItem>
+                  <NavDropdownItem href="/account/llm-config" icon={Cpu}>{t("nav.llmConfig")}</NavDropdownItem>
                   {canPublish && (
-                    <NavDropdownItem href="/account/judge-profiles" icon={Gavel}>评分器设置</NavDropdownItem>
+                    <NavDropdownItem href="/account/judge-profiles" icon={Gavel}>{t("nav.judgeProfiles")}</NavDropdownItem>
                   )}
                   {canPublish && (
-                    <NavDropdownItem href="/account/question-banks" icon={Library}>题库管理</NavDropdownItem>
+                    <NavDropdownItem href="/account/question-banks" icon={Library}>{t("nav.questionBanks")}</NavDropdownItem>
                   )}
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  <NavDropdownItem href="/account/settings" icon={Settings}>账户设置</NavDropdownItem>
+                  <NavDropdownItem href="/account/settings" icon={Settings}>{t("nav.accountSettings")}</NavDropdownItem>
                   <DropdownMenuItem
                     className="flex items-center gap-2 text-destructive cursor-pointer"
                     onClick={handleLogout}
                   >
-                    <LogOut className="h-4 w-4" />退出登录
+                    <LogOut className="h-4 w-4" />{t("nav.logout")}
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
               </DropdownMenuContent>

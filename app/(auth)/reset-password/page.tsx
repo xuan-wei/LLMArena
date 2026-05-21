@@ -7,8 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { PublicLanguageToggle } from "@/components/auth/PublicLanguageToggle";
 
 function ResetPasswordForm() {
+  const { publicLanguage, t } = useAuth();
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
   const [form, setForm] = useState({ newPassword: "", confirmPassword: "" });
@@ -17,30 +20,30 @@ function ResetPasswordForm() {
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
-    if (!token) setErrorMsg("无效的重置链接，请重新申请。");
-  }, [token]);
+    if (!token) setErrorMsg(t("auth.invalidResetLink"));
+  }, [token, t]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (form.newPassword.length < 6) return toast.error("密码至少6位");
-    if (form.newPassword !== form.confirmPassword) return toast.error("两次密码不一致");
+    if (form.newPassword.length < 6) return toast.error(t("auth.passwordTooShort"));
+    if (form.newPassword !== form.confirmPassword) return toast.error(t("auth.passwordMismatch"));
     setLoading(true);
     setErrorMsg("");
     try {
       const res = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, newPassword: form.newPassword }),
+        body: JSON.stringify({ token, newPassword: form.newPassword, language: publicLanguage }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setErrorMsg(data.error || "重置失败");
+        setErrorMsg(data.error || t("auth.resetFailed"));
       } else {
         setDone(true);
-        toast.success("密码已重置，请登录");
+        toast.success(t("auth.passwordResetToast"));
       }
     } catch {
-      setErrorMsg("网络错误，请稍后重试");
+      setErrorMsg(t("auth.networkRetry"));
     } finally {
       setLoading(false);
     }
@@ -51,10 +54,10 @@ function ResetPasswordForm() {
       {done ? (
         <div className="space-y-4">
           <div className="rounded-md border border-green-200 bg-green-50 px-3 py-3 text-sm text-green-700">
-            密码已重置成功！
+            {t("auth.passwordResetSuccess")}
           </div>
           <Link href="/login" className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
-            前往登录
+            {t("auth.goToLogin")}
           </Link>
         </div>
       ) : (
@@ -66,31 +69,31 @@ function ResetPasswordForm() {
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="newPassword">新密码（至少6位）</Label>
+              <Label htmlFor="newPassword">{t("auth.newPassword")}</Label>
               <Input
                 id="newPassword"
                 type="password"
                 value={form.newPassword}
                 onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
-                placeholder="输入新密码"
+                placeholder={t("auth.enterNewPassword")}
                 required
                 disabled={!token}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">确认新密码</Label>
+              <Label htmlFor="confirmPassword">{t("auth.confirmPassword")}</Label>
               <Input
                 id="confirmPassword"
                 type="password"
                 value={form.confirmPassword}
                 onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-                placeholder="再次输入新密码"
+                placeholder={t("auth.enterNewPasswordAgain")}
                 required
                 disabled={!token}
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading || !token}>
-              {loading ? "重置中..." : "确认重置"}
+              {loading ? t("auth.resetting") : t("auth.confirmReset")}
             </Button>
           </form>
         </>
@@ -100,20 +103,22 @@ function ResetPasswordForm() {
 }
 
 export default function ResetPasswordPage() {
+  const { t } = useAuth();
   return (
-    <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/30">
+    <div className="relative flex-1 flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/30">
+      <PublicLanguageToggle />
       <div className="w-full max-w-sm px-4">
         <div className="text-center mb-8">
           <div className="text-4xl mb-3">🏆</div>
           <h1 className="text-2xl font-bold tracking-tight">Arena</h1>
-          <p className="text-muted-foreground text-sm mt-1">大模型竞技场</p>
+          <p className="text-muted-foreground text-sm mt-1">{t("brand.name")}</p>
         </div>
         <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg">重置密码</CardTitle>
-            <CardDescription>设置您的新密码</CardDescription>
+            <CardTitle className="text-lg">{t("auth.resetTitle")}</CardTitle>
+            <CardDescription>{t("auth.resetDesc")}</CardDescription>
           </CardHeader>
-          <Suspense fallback={<CardContent><p className="text-sm text-muted-foreground text-center py-4">加载中...</p></CardContent>}>
+          <Suspense fallback={<CardContent><p className="text-sm text-muted-foreground text-center py-4">{t("common.loading")}</p></CardContent>}>
             <ResetPasswordForm />
           </Suspense>
         </Card>

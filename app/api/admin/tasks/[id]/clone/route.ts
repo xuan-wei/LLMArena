@@ -2,21 +2,23 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUserFresh } from "@/lib/auth";
 import { canManageTask } from "@/lib/permissions";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const user = await getUserFresh(request);
+  const lang = await getRequestLanguage(request);
   const { id } = await params;
 
   const source = await prisma.task.findUnique({
     where: { id },
     include: { questions: { orderBy: { orderIndex: "asc" } } },
   });
-  if (!source) return NextResponse.json({ error: "活动不存在" }, { status: 404 });
+  if (!source) return NextResponse.json({ error: st(lang, "api.taskNotFound") }, { status: 404 });
   if (!canManageTask(user, source.createdBy)) {
-    return NextResponse.json({ error: "无权限" }, { status: 403 });
+    return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
   }
 
   try {
@@ -53,6 +55,6 @@ export async function POST(
     return NextResponse.json({ task }, { status: 201 });
   } catch (error) {
     console.error("Clone task error:", error);
-    return NextResponse.json({ error: "克隆活动失败" }, { status: 500 });
+    return NextResponse.json({ error: st(lang, "api.cloneFailed") }, { status: 500 });
   }
 }

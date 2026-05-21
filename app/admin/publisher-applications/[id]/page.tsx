@@ -29,7 +29,7 @@ const STATUS_STYLES: Record<string, { label: string; className: string }> = {
 };
 
 export default function ApplicationDetailPage() {
-  const { user, loading, authFetch } = useAuth();
+  const { user, loading, authFetch, locale } = useAuth();
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
@@ -119,12 +119,12 @@ export default function ApplicationDetailPage() {
             </div>
             <div className="grid grid-cols-3 gap-2">
               <span className="text-muted-foreground">申请时间</span>
-              <span className="col-span-2">{new Date(app.createdAt).toLocaleString("zh-CN")}</span>
+              <span className="col-span-2">{new Date(app.createdAt).toLocaleString(locale)}</span>
             </div>
             {app.reviewedAt && (
               <div className="grid grid-cols-3 gap-2">
                 <span className="text-muted-foreground">审批时间</span>
-                <span className="col-span-2">{new Date(app.reviewedAt).toLocaleString("zh-CN")}</span>
+                <span className="col-span-2">{new Date(app.reviewedAt).toLocaleString(locale)}</span>
               </div>
             )}
             {app.reviewer && (

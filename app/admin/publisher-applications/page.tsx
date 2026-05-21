@@ -33,7 +33,7 @@ const STATUS_STYLES: Record<string, { label: string; className: string }> = {
 const PAGE_SIZE = 20;
 
 export default function PublisherApplicationsPage() {
-  const { user, loading, authFetch } = useAuth();
+  const { user, loading, authFetch, locale } = useAuth();
   const router = useRouter();
   const [applications, setApplications] = useState<Application[]>([]);
   const [total, setTotal] = useState(0);
@@ -142,7 +142,7 @@ export default function PublisherApplicationsPage() {
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{app.reviewer?.name || "—"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {new Date(app.createdAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        {new Date(app.createdAt).toLocaleString(locale, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                       </TableCell>
                       <TableCell>
                         <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
@@ -206,12 +206,12 @@ export default function PublisherApplicationsPage() {
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <span className="text-muted-foreground">申请时间</span>
-                    <span className="col-span-2">{new Date(selected.createdAt).toLocaleString("zh-CN")}</span>
+                    <span className="col-span-2">{new Date(selected.createdAt).toLocaleString(locale)}</span>
                   </div>
                   {selected.reviewedAt && (
                     <div className="grid grid-cols-3 gap-2">
                       <span className="text-muted-foreground">审批时间</span>
-                      <span className="col-span-2">{new Date(selected.reviewedAt).toLocaleString("zh-CN")}</span>
+                      <span className="col-span-2">{new Date(selected.reviewedAt).toLocaleString(locale)}</span>
                     </div>
                   )}
                   {selected.reviewer && (

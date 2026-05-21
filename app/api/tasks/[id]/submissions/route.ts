@@ -2,13 +2,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser } from "@/lib/auth";
 import { submissionQueue } from "@/lib/queue";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = getUser(request);
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  const lang = await getRequestLanguage(request);
+  if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
 
   const { id } = await params;
   const submissions = await prisma.submission.findMany({
@@ -25,7 +27,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = getUser(request);
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  const lang = await getRequestLanguage(request);
+  if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
 
   const { id } = await params;
 
@@ -33,9 +36,9 @@ export async function POST(
     where: { id },
     include: { adminStudentLLMConfig: true },
   });
-  if (!task) return NextResponse.json({ error: "任务不存在" }, { status: 404 });
+  if (!task) return NextResponse.json({ error: st(lang, "api.taskNotFound") }, { status: 404 });
   if (task.status !== "PRELIMINARY" && task.status !== "FINALS") {
-    return NextResponse.json({ error: "当前不在提交阶段" }, { status: 400 });
+    return NextResponse.json({ error: st(lang, "api.submitNotOpen") }, { status: 400 });
   }
 
   const phase = task.status === "FINALS" ? "FINALS" : "PRELIMINARY";
@@ -44,11 +47,11 @@ export async function POST(
     where: { taskId_userId: { taskId: id, userId: user.sub } },
   });
   if (!enrollment) {
-    return NextResponse.json({ error: "尚未报名" }, { status: 400 });
+    return NextResponse.json({ error: st(lang, "api.enrollmentRequired") }, { status: 400 });
   }
 
   if (phase === "FINALS" && !enrollment.isFinalist) {
-    return NextResponse.json({ error: "您未入选终赛" }, { status: 403 });
+    return NextResponse.json({ error: st(lang, "api.notFinalist") }, { status: 403 });
   }
 
   const maxSubs = phase === "FINALS" ? task.maxFinalSubs : task.maxPrelimSubs;
@@ -58,10 +61,10 @@ export async function POST(
   if (task.adminLLMEnabled) {
     const cfg = task.adminStudentLLMConfig;
     if (!cfg || !cfg.apiBaseUrl || !cfg.apiKey) {
-      return NextResponse.json({ error: "管理员尚未完成接入配置，请联系管理员" }, { status: 400 });
+      return NextResponse.json({ error: st(lang, "api.adminLLMIncomplete") }, { status: 400 });
     }
     if (!task.adminModel) {
-      return NextResponse.json({ error: "管理员未选择模型，请联系管理员" }, { status: 400 });
+      return NextResponse.json({ error: st(lang, "api.adminModelMissing") }, { status: 400 });
     }
     promptSnapshot = enrollment.prompt || null;
   } else if (enrollment.mode === "OPENAI_COMPATIBLE") {
@@ -69,20 +72,20 @@ export async function POST(
       where: { id: enrollment.studentLLMConfigId ?? "", userId: user.sub },
     });
     if (!llmCfg || !llmCfg.apiBaseUrl || !llmCfg.apiKey) {
-      return NextResponse.json({ error: "请先在 Chatbot 配置中选择 LLM 账号" }, { status: 400 });
+      return NextResponse.json({ error: st(lang, "api.selectLLMAccount") }, { status: 400 });
     }
     if (!enrollment.model) {
-      return NextResponse.json({ error: "请先在 Chatbot 配置中选择模型" }, { status: 400 });
+      return NextResponse.json({ error: st(lang, "api.selectModel") }, { status: 400 });
     }
     promptSnapshot = enrollment.prompt || null;
   } else if (enrollment.mode === "DIFY") {
     if (!enrollment.difyEndpoint || !enrollment.difyApiKey) {
-      return NextResponse.json({ error: "请先在 Chatbot 配置中完善 Dify 配置" }, { status: 400 });
+      return NextResponse.json({ error: st(lang, "api.difyIncomplete") }, { status: 400 });
     }
     promptSnapshot = `[Dify] ${enrollment.difyEndpoint}`;
   } else if (enrollment.mode === "COZE") {
     if (!enrollment.cozeEndpoint || !enrollment.cozeApiKey || !enrollment.cozeBotId) {
-      return NextResponse.json({ error: "请先在 Chatbot 配置中完善 Coze 配置" }, { status: 400 });
+      return NextResponse.json({ error: st(lang, "api.cozeIncomplete") }, { status: 400 });
     }
     promptSnapshot = `[Coze] ${enrollment.cozeEndpoint} Bot: ${enrollment.cozeBotId}`;
   }
@@ -117,9 +120,9 @@ export async function POST(
   } catch (err) {
     if (err instanceof Error) {
       if (err.message === "LIMIT")
-        return NextResponse.json({ error: `已达到最大提交次数 (${maxSubs})` }, { status: 400 });
+        return NextResponse.json({ error: st(lang, "api.submissionLimit", { count: maxSubs }) }, { status: 400 });
       if (err.message === "RUNNING")
-        return NextResponse.json({ error: "有正在运行的提交，请稍后再试" }, { status: 400 });
+        return NextResponse.json({ error: st(lang, "api.submissionRunning") }, { status: 400 });
     }
     throw err;
   }

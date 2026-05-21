@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { PublicLanguageToggle } from "@/components/auth/PublicLanguageToggle";
 
 interface SSOProvider {
   id: string;
@@ -15,7 +16,7 @@ interface SSOProvider {
 }
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, t } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -39,24 +40,25 @@ export default function LoginPage() {
     try {
       await login(email, password);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "登录失败");
+      toast.error(error instanceof Error ? error.message : t("auth.loginFailed"));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/30">
+    <div className="relative flex-1 flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/30">
+      <PublicLanguageToggle />
       <div className="w-full max-w-sm px-4">
         <div className="text-center mb-8">
           <div className="text-4xl mb-3">🏆</div>
           <h1 className="text-2xl font-bold tracking-tight">Arena</h1>
-          <p className="text-muted-foreground text-sm mt-1">大模型竞技场</p>
+          <p className="text-muted-foreground text-sm mt-1">{t("brand.name")}</p>
         </div>
         <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg">登录</CardTitle>
-            <CardDescription>使用你的账号登录平台</CardDescription>
+            <CardTitle className="text-lg">{t("auth.loginTitle")}</CardTitle>
+            <CardDescription>{t("auth.loginDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {errorMsg && (
@@ -67,7 +69,7 @@ export default function LoginPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">邮箱</Label>
+                <Label htmlFor="email">{t("auth.email")}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -78,7 +80,7 @@ export default function LoginPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">密码</Label>
+                <Label htmlFor="password">{t("auth.password")}</Label>
                 <Input
                   id="password"
                   type="password"
@@ -89,7 +91,7 @@ export default function LoginPage() {
                 />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "登录中..." : "登录"}
+                {loading ? t("auth.loggingIn") : t("auth.loginTitle")}
               </Button>
             </form>
 
@@ -100,7 +102,7 @@ export default function LoginPage() {
                     <span className="w-full border-t" />
                   </div>
                   <div className="relative flex justify-center text-xs text-muted-foreground">
-                    <span className="bg-white/80 px-2">或通过合作机构账号登录</span>
+                    <span className="bg-white/80 px-2">{t("auth.institutionLogin")}</span>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -120,12 +122,12 @@ export default function LoginPage() {
 
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <Link href="/forgot-password" className="hover:underline">
-                忘记密码？
+                {t("auth.forgotPassword")}
               </Link>
               <span>
-                还没有账号？{" "}
+                {t("auth.noAccount")}{" "}
                 <Link href="/register" className="text-primary hover:underline font-medium">
-                  注册
+                  {t("auth.registerTitle")}
                 </Link>
               </span>
             </div>

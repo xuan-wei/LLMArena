@@ -40,7 +40,7 @@ export default function DashboardPage() {
 }
 
 function DashboardContent() {
-  const { user, loading, authFetch, refreshUser } = useAuth();
+  const { user, loading, authFetch, refreshUser, locale } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const refreshedRef = useRef(false);
@@ -260,7 +260,7 @@ function DashboardContent() {
                           </TableCell>
                           <TableCell className="text-center text-sm text-muted-foreground">{task._count.questions}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            {new Date(task.createdAt).toLocaleDateString("zh-CN")}
+                            {new Date(task.createdAt).toLocaleDateString(locale)}
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1">
@@ -378,7 +378,7 @@ function DashboardContent() {
                                 )}
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground">
-                                {new Date(task.createdAt).toLocaleDateString("zh-CN")}
+                                {new Date(task.createdAt).toLocaleDateString(locale)}
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1">

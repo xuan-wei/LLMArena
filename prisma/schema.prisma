@@ -15,6 +15,7 @@ model User {
   passwordHash  String?
   role          Role     @default(STUDENT)
   canPublish    Boolean  @default(false)
+  language      String   @default("zh")
   createdAt     DateTime @default(now())
   // SSO fields — null for password-registered users
   institution   String?  // provider id, e.g. "jaccount"

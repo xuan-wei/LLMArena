@@ -82,8 +82,6 @@ const MODE_LABELS: Record<string, string> = {
   ADMIN_LLM: "管理员指定", OPENAI_COMPATIBLE: "LLM（OpenAI API）", DIFY: "Dify Chatbot", COZE: "Coze Chatbot",
 };
 
-const TWENTY_FOUR_POINT_PROMPT =
-  "你正在参加 24 点游戏。题目会给出 4 个数字，请每个数字恰好使用一次，只能使用 +、-、*、/ 和括号，构造一个结果等于 24 的表达式。只输出最终表达式，不要把题目理解成数列规律或预测下一个数字。题目：{{question}}";
 
 function looksLikeTwentyFourPointQuestion(content: string) {
   const nums = content.match(/-?\d+(?:\.\d+)?/g) ?? [];
@@ -98,7 +96,7 @@ function shouldUseTwentyFourPointPrompt(questions: Question[]) {
 // ────────── Main Page ──────────
 export default function TaskPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { user, loading, authFetch } = useAuth();
+  const { user, loading, authFetch, locale } = useAuth();
   const router = useRouter();
 
   const [task, setTask] = useState<Task | null>(null);
@@ -662,9 +660,10 @@ function SubmitTab({
   llmConfigs: LLMConfig[];
   authFetch: (url: string, opts?: RequestInit) => Promise<Response>;
 }) {
-  const isTwentyFourPointTask = shouldUseTwentyFourPointPrompt(publicQuestions);
-  const recommendedPrompt = isTwentyFourPointTask ? TWENTY_FOUR_POINT_PROMPT : "请回答以下问题：\n\n{{question}}";
-  const [prompt, setPrompt] = useState(enrollment.prompt || (enrollment.mode === "OPENAI_COMPATIBLE" && isTwentyFourPointTask ? TWENTY_FOUR_POINT_PROMPT : ""));
+  const { t, locale } = useAuth();  const isTwentyFourPointTask = shouldUseTwentyFourPointPrompt(publicQuestions);
+  const twentyFourPrompt = t("template.twentyFourPrompt");
+  const recommendedPrompt = isTwentyFourPointTask ? twentyFourPrompt : "Please answer the following question:\n\n{{question}}";
+  const [prompt, setPrompt] = useState(enrollment.prompt || (enrollment.mode === "OPENAI_COMPATIBLE" && isTwentyFourPointTask ? twentyFourPrompt : ""));
   const [savingPrompt, setSavingPrompt] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [validateDialog, setValidateDialog] = useState<{ open: boolean; status: "testing" | "success" | "fail"; message?: string }>({ open: false, status: "testing" });
@@ -964,15 +963,15 @@ function SubmitTab({
             <CardContent className="pb-3 space-y-2">
               {isTwentyFourPointTask && enrollment.mode === "OPENAI_COMPATIBLE" && (
                 <div className="rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-                  当前公开题目看起来是 24 点格式。建议 Prompt 明确写出“每个数字恰好使用一次，构造等于 24 的表达式”，避免模型把题目误解成数列规律。
+                  {t(“task.recommended24Prompt”)}
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
                     className="mt-2 h-7 text-xs"
-                    onClick={() => setPrompt(TWENTY_FOUR_POINT_PROMPT)}
+                    onClick={() => setPrompt(twentyFourPrompt)}
                   >
-                    使用推荐 Prompt
+                    {t("task.useRecommendedPrompt")}
                   </Button>
                 </div>
               )}
@@ -984,9 +983,7 @@ function SubmitTab({
                 className="font-mono text-xs"
               />
               <p className="text-xs text-muted-foreground">
-                题目占位符为 <code className="bg-muted px-1 rounded">{"{{question}}"}</code>，输入给大模型之前，<code className="bg-muted px-1 rounded">{"{{question}}"}</code> 会替换成问题题干；你可以根据情况将其放在 Prompt 的不同位置。
-                <br />
-                若 Prompt 不含占位符，系统会自动在末尾追加题目内容。
+                {t("task.promptHelp")}
               </p>
               <Button size="sm" variant="outline" onClick={savePrompt} disabled={savingPrompt}>
                 {savingPrompt ? "保存中..." : "保存 Prompt"}
@@ -1211,7 +1208,7 @@ function SubmitTab({
                               </span>
                             </div>
                             <p className="text-xs text-muted-foreground mt-1">
-                              {new Date(sub.createdAt).toLocaleString("zh-CN")}
+                              {new Date(sub.createdAt).toLocaleString(locale)}
                             </p>
                             {(sub.status === "COMPLETED" || sub.status === "SYSERR") && (
                               <div className="flex gap-1 mt-1.5">
@@ -1336,6 +1333,7 @@ function LeaderboardTab({
   currentUserId: string;
   onRefresh: () => void;
 }) {
+  const { locale } = useAuth();
   const showFinals = (taskStatus === "FINALS" || taskStatus === "ENDED") && finalsLeaderboard.length > 0;
   const [phase, setPhase] = useState<"PRELIMINARY" | "FINALS">("PRELIMINARY");
   const [sortBy, setSortBy] = useState<"publicScore" | "privateScore">("publicScore");
@@ -1415,7 +1413,7 @@ function LeaderboardTab({
                   )}
                   <TableCell className="text-right text-muted-foreground">{e.submissionCount}</TableCell>
                   <TableCell className="text-right text-xs text-muted-foreground">
-                    {new Date(e.submittedAt).toLocaleString("zh-CN")}
+                    {new Date(e.submittedAt).toLocaleString(locale)}
                   </TableCell>
                 </TableRow>
               ))}

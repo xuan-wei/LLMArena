@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser } from "@/lib/auth";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const user = getUser(request);
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  const lang = await getRequestLanguage(request);
+  if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
 
   const { id: taskId } = await params;
 
@@ -16,15 +18,14 @@ export async function DELETE(
     include: { task: { select: { status: true, createdBy: true } } },
   });
 
-  if (!enrollment) return NextResponse.json({ error: "未订阅该活动" }, { status: 404 });
+  if (!enrollment) return NextResponse.json({ error: st(lang, "api.enrollmentRequired") }, { status: 404 });
   if (enrollment.task.createdBy === user.sub) {
-    return NextResponse.json({ error: "不能退订自己发布的活动" }, { status: 400 });
+    return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 400 });
   }
-  if (enrollment.task.status !== "PRELIMINARY") {
-    return NextResponse.json({ error: "当前阶段不能退订" }, { status: 400 });
+  if (enrollment.task.status !== "PRELIMINARY" && enrollment.task.status !== "ENDED") {
+    return NextResponse.json({ error: st(lang, "api.withdrawNotAllowed") }, { status: 400 });
   }
 
-  // Delete enrollment only — submissions and answers are kept
   await prisma.enrollment.delete({ where: { id: enrollment.id } });
 
   return NextResponse.json({ ok: true });

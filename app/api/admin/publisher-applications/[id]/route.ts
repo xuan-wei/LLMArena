@@ -46,7 +46,7 @@ export async function PATCH(
     return NextResponse.json({ error: "该申请已处理" }, { status: 409 });
   }
 
-  const appUser = await prisma.user.findUnique({ where: { id: application.userId }, select: { email: true, name: true } });
+  const appUser = await prisma.user.findUnique({ where: { id: application.userId }, select: { email: true, name: true, language: true } });
 
   // Mark all admin notifications about this application as read (notification "ends")
   const markNotificationsRead = prisma.notification.updateMany({
@@ -68,14 +68,14 @@ export async function PATCH(
         data: {
           userId: application.userId,
           type: "PUBLISHER_GRANTED",
-          title: "发布权限已通过",
-          body: "您的发布权限申请已审批通过，现在可以创建和发布活动。",
+          title: appUser?.language === "zh" ? "发布权限已通过" : "Publisher access approved",
+          body: appUser?.language === "zh" ? "您的发布权限申请已审批通过，现在可以创建和发布活动。" : "Your publisher access request has been approved. You can now create and publish activities.",
         },
       }),
       markNotificationsRead,
     ]);
     if (appUser) {
-      sendPublisherGrantedEmail(appUser.email, appUser.name).catch(console.error);
+      sendPublisherGrantedEmail(appUser.email, appUser.name, appUser.language === "zh" ? "zh" : "en").catch(console.error);
     }
   } else {
     await prisma.$transaction([
@@ -87,14 +87,16 @@ export async function PATCH(
         data: {
           userId: application.userId,
           type: "APPLICATION_REJECTED",
-          title: "发布权限申请未通过",
-          body: rejectReason ? `申请未通过，原因：${rejectReason}` : "您的发布权限申请未通过审核。",
+          title: appUser?.language === "zh" ? "发布权限申请未通过" : "Publisher access request rejected",
+          body: appUser?.language === "zh"
+            ? (rejectReason ? `申请未通过，原因：${rejectReason}` : "您的发布权限申请未通过审核。")
+            : (rejectReason ? `Request rejected. Reason: ${rejectReason}` : "Your publisher access request was rejected."),
         },
       }),
       markNotificationsRead,
     ]);
     if (appUser) {
-      sendPublisherRejectedEmail(appUser.email, appUser.name, rejectReason).catch(console.error);
+      sendPublisherRejectedEmail(appUser.email, appUser.name, rejectReason, appUser.language === "zh" ? "zh" : "en").catch(console.error);
     }
   }
 

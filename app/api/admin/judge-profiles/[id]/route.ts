@@ -2,19 +2,21 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser, getUserFresh } from "@/lib/auth";
 import { isAdmin, canPublishTasks } from "@/lib/permissions";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await getUserFresh(request);
-  if (!canPublishTasks(user)) return NextResponse.json({ error: "无权限" }, { status: 403 });
+  const lang = await getRequestLanguage(request);
+  if (!canPublishTasks(user)) return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
 
   const { id } = await params;
   const profile = await prisma.judgeProfile.findUnique({ where: { id }, select: { createdBy: true } });
-  if (!profile) return NextResponse.json({ error: "不存在" }, { status: 404 });
+  if (!profile) return NextResponse.json({ error: st(lang, "api.notFound") }, { status: 404 });
   if (!isAdmin(user) && profile.createdBy !== user.sub) {
-    return NextResponse.json({ error: "无权限" }, { status: 403 });
+    return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
   }
 
   const { name, llmConfigId, studentLLMConfigId, model, type, systemPrompt, enableThinking, thinkingBudget, temperature, maxTokens } = await request.json();
@@ -45,13 +47,22 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await getUserFresh(request);
-  if (!canPublishTasks(user)) return NextResponse.json({ error: "无权限" }, { status: 403 });
+  const lang = await getRequestLanguage(request);
+  if (!canPublishTasks(user)) return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
 
   const { id } = await params;
   const profile = await prisma.judgeProfile.findUnique({ where: { id }, select: { createdBy: true } });
-  if (!profile) return NextResponse.json({ error: "不存在" }, { status: 404 });
+  if (!profile) return NextResponse.json({ error: st(lang, "api.notFound") }, { status: 404 });
   if (!isAdmin(user) && profile.createdBy !== user.sub) {
-    return NextResponse.json({ error: "无权限" }, { status: 403 });
+    return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
+  }
+
+  const taskCount = await prisma.task.count({ where: { judgeProfileId: id } });
+  if (taskCount > 0) {
+    return NextResponse.json(
+      { error: st(lang, "api.judgeProfileInUse", { count: taskCount }) },
+      { status: 400 },
+    );
   }
 
   const taskCount = await prisma.task.count({ where: { judgeProfileId: id } });

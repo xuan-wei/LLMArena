@@ -24,6 +24,7 @@ interface LLMConfig {
 export default function LLMConfigsPage() {
   const { user, loading, authFetch } = useAuth();
   const router = useRouter();
+  const language = user?.language === "en" ? "en" : "zh";
   const [configs, setConfigs] = useState<LLMConfig[]>([]);
   const [form, setForm] = useState({ name: "", baseUrl: "", apiKey: "", models: "" });
   const [editId, setEditId] = useState<string | null>(null);
@@ -172,7 +173,7 @@ export default function LLMConfigsPage() {
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{editId ? "编辑" : "添加"} LLM 配置</DialogTitle>
+              <DialogTitle>{language === "en" ? `${editId ? "Edit" : "Add"} LLM Config` : `${editId ? "编辑" : "添加"} LLM 配置`}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-2">
               <div className="space-y-1.5">

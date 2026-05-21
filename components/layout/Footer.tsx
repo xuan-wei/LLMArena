@@ -9,8 +9,9 @@ interface Stats {
 }
 
 export function Footer({ copyright, icp }: { copyright?: string; icp?: string }) {
-  const { user, loading } = useAuth();
+  const { user, loading, publicLanguage } = useAuth();
   const [stats, setStats] = useState<Stats | null>(null);
+  const language = user?.language ?? publicLanguage;
 
   useEffect(() => {
     if (loading) return; // wait for auth to resolve before first ping
@@ -35,6 +36,7 @@ export function Footer({ copyright, icp }: { copyright?: string; icp?: string })
   }, [loading, user?.id]);
 
   if (!copyright && !icp) return null;
+  const locale = language === "zh" ? "zh-CN" : "en-US";
 
   return (
     <footer className="border-t py-4 text-center text-xs text-muted-foreground">
@@ -49,11 +51,11 @@ export function Footer({ copyright, icp }: { copyright?: string; icp?: string })
         {stats && (
           <>
             <span className="mx-2">·</span>
-            访问 {stats.visits.toLocaleString("zh-CN")}
+            {language === "zh" ? "访问" : "Visits"} {stats.visits.toLocaleString(locale)}
             <span className="mx-1.5">·</span>
-            注册 {stats.users.toLocaleString("zh-CN")}
+            {language === "zh" ? "注册" : "Users"} {stats.users.toLocaleString(locale)}
             <span className="mx-1.5">·</span>
-            在线 {stats.online}
+            {language === "zh" ? "在线" : "Online"} {stats.online}
           </>
         )}
       </p>

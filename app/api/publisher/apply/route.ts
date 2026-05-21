@@ -29,21 +29,50 @@ export async function POST(request: Request) {
     data: { userId: user.sub, institution, homepage: homepage || null, purpose },
   });
 
-  // Notify all admins
-  const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true, email: true } });
+  // Notify all admins in-app; email only the configured recipients.
+  const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true, email: true, language: true } });
   const applicant = await prisma.user.findUnique({ where: { id: user.sub }, select: { name: true } });
   if (admins.length > 0 && applicant) {
+    const emailConfigs = await prisma.systemConfig.findMany({
+      where: {
+        key: {
+          in: ["publisher_application_email_enabled", "publisher_application_email_recipients"],
+        },
+      },
+    });
+    const configMap = Object.fromEntries(emailConfigs.map((c) => [c.key, c.value]));
+    const emailEnabled = configMap.publisher_application_email_enabled === "true";
+    let recipientIds: string[] = [];
+    try {
+      const parsed = JSON.parse(configMap.publisher_application_email_recipients || "[]");
+      recipientIds = Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+    } catch {
+      recipientIds = [];
+    }
+    const emailAdmins = emailEnabled ? admins.filter((admin) => recipientIds.includes(admin.id)) : [];
+
     await Promise.all([
       prisma.notification.createMany({
         data: admins.map((a) => ({
           userId: a.id,
           type: "NEW_APPLICATION",
-          title: "收到新的发布权限申请",
-          body: `用户 ${applicant.name} 提交了发布权限申请，请前往管理控制台审批。`,
+          title: a.language === "zh" ? "收到新的发布权限申请" : "New publisher access request",
+          body: a.language === "zh"
+            ? `用户 ${applicant.name} 提交了发布权限申请，请前往管理控制台审批。`
+            : `User ${applicant.name} submitted a publisher access request. Please review it in the admin console.`,
           refId: application.id,
         })),
       }),
-      sendAdminNewApplicationEmail(admins.map((a) => a.email), applicant.name).catch(console.error),
+      emailAdmins.length > 0
+        ? Promise.all(
+            Object.entries(emailAdmins.reduce<Record<string, string[]>>((acc, admin) => {
+              const language = admin.language === "zh" ? "zh" : "en";
+              acc[language] ??= [];
+              acc[language].push(admin.email);
+              return acc;
+            }, {})).map(([language, emails]) => sendAdminNewApplicationEmail(emails, applicant.name, language as "en" | "zh")),
+          ).catch(console.error)
+        : Promise.resolve(),
     ]);
   }
 

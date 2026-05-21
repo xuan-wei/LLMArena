@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { toast } from "sonner";
 
 export default function SettingsPage() {
-  const { user, loading, authFetch } = useAuth();
+  const { user, loading, authFetch, setLanguage, t } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -21,9 +21,9 @@ export default function SettingsPage() {
   const [sendingReset, setSendingReset] = useState(false);
 
   const changePassword = async () => {
-    if (!form.currentPassword || !form.newPassword) return toast.error("请填写当前密码和新密码");
-    if (form.newPassword.length < 6) return toast.error("新密码至少 6 位");
-    if (form.newPassword !== form.confirmPassword) return toast.error("两次输入的新密码不一致");
+    if (!form.currentPassword || !form.newPassword) return toast.error(t("account.settings.fillBoth"));
+    if (form.newPassword.length < 6) return toast.error(t("auth.passwordTooShort"));
+    if (form.newPassword !== form.confirmPassword) return toast.error(t("account.settings.passwordMismatch"));
     setSaving(true);
     try {
       const res = await authFetch("/api/account/password", {
@@ -31,11 +31,11 @@ export default function SettingsPage() {
         body: JSON.stringify({ currentPassword: form.currentPassword, newPassword: form.newPassword }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "修改失败");
-      toast.success("密码已修改");
+      if (!res.ok) throw new Error(data.error || t("account.settings.changeFailed"));
+      toast.success(t("account.settings.passwordChanged"));
       setForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "修改失败");
+      toast.error(e instanceof Error ? e.message : t("account.settings.changeFailed"));
     } finally {
       setSaving(false);
     }
@@ -51,10 +51,10 @@ export default function SettingsPage() {
         body: JSON.stringify({ email: user.email }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "发送失败");
-      toast.success("重置链接已发送至您的邮箱，1 小时内有效");
+      if (!res.ok) throw new Error(data.error || t("account.settings.sendFailed"));
+      toast.success(t("account.settings.resetSent"));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "发送失败");
+      toast.error(e instanceof Error ? e.message : t("account.settings.sendFailed"));
     } finally {
       setSendingReset(false);
     }
@@ -62,60 +62,81 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <Navbar backHref="/account" backLabel="账户中心" breadcrumbs={[{ label: "账户设置" }]} />
+      <Navbar backHref="/account" backLabel={t("account.center")} breadcrumbs={[{ label: t("account.settings.title") }]} />
       <main className="max-w-lg mx-auto px-4 py-8 space-y-6">
-        <h1 className="text-2xl font-bold">账户设置</h1>
+        <h1 className="text-2xl font-bold">{t("account.settings.title")}</h1>
 
         <Card>
           <CardHeader>
-            <CardTitle>修改密码</CardTitle>
-            <CardDescription>当前账号：{user?.name || user?.email}</CardDescription>
+            <CardTitle>{t("account.settings.languageTitle")}</CardTitle>
+            <CardDescription>{t("account.settings.languageDesc")}</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>当前密码</Label>
-              <Input
-                type="password"
-                value={form.currentPassword}
-                onChange={(e) => setForm({ ...form, currentPassword: e.target.value })}
-                placeholder="输入当前密码"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>新密码（至少 6 位）</Label>
-              <Input
-                type="password"
-                value={form.newPassword}
-                onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
-                placeholder="输入新密码"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>确认新密码</Label>
-              <Input
-                type="password"
-                value={form.confirmPassword}
-                onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-                placeholder="再次输入新密码"
-                onKeyDown={(e) => e.key === "Enter" && changePassword()}
-              />
-            </div>
-            <Button className="w-full" onClick={changePassword} disabled={saving}>
-              {saving ? "保存中..." : "修改密码"}
+          <CardContent className="flex gap-2">
+            <Button
+              variant={user?.language === "en" ? "default" : "outline"}
+              onClick={() => setLanguage("en").then(() => toast.success(t("account.settings.languageSaved"))).catch((e) => toast.error(e instanceof Error ? e.message : t("config.saveFailed")))}
+            >
+              {t("common.english")}
+            </Button>
+            <Button
+              variant={user?.language === "zh" ? "default" : "outline"}
+              onClick={() => setLanguage("zh").then(() => toast.success(t("account.settings.languageSaved"))).catch((e) => toast.error(e instanceof Error ? e.message : t("config.saveFailed")))}
+            >
+              {t("common.chinese")}
             </Button>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>通过邮件重置密码</CardTitle>
+            <CardTitle>{t("account.settings.password")}</CardTitle>
+            <CardDescription>{t("account.settings.currentAccount", { name: user?.name || user?.email })}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>{t("account.settings.currentPassword")}</Label>
+              <Input
+                type="password"
+                value={form.currentPassword}
+                onChange={(e) => setForm({ ...form, currentPassword: e.target.value })}
+                placeholder={t("account.settings.enterCurrentPassword")}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t("account.settings.newPassword")}</Label>
+              <Input
+                type="password"
+                value={form.newPassword}
+                onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
+                placeholder={t("account.settings.enterNewPassword")}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t("account.settings.confirmPassword")}</Label>
+              <Input
+                type="password"
+                value={form.confirmPassword}
+                onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                placeholder={t("account.settings.enterNewPasswordAgain")}
+                onKeyDown={(e) => e.key === "Enter" && changePassword()}
+              />
+            </div>
+            <Button className="w-full" onClick={changePassword} disabled={saving}>
+              {saving ? t("common.saving") : t("account.settings.changePassword")}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("account.settings.resetByEmail")}</CardTitle>
             <CardDescription>
-              忘记当前密码？向 <span className="font-mono">{user?.email}</span> 发送重置链接
+              {t("account.settings.resetDesc", { email: user?.email })}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button variant="outline" onClick={sendResetEmail} disabled={sendingReset}>
-              {sendingReset ? "发送中..." : "发送重置邮件"}
+              {sendingReset ? t("account.settings.sending") : t("account.settings.sendReset")}
             </Button>
           </CardContent>
         </Card>

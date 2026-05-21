@@ -7,9 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { PublicLanguageToggle } from "@/components/auth/PublicLanguageToggle";
 
 export default function RegisterPage() {
-  const { register } = useAuth();
+  const { register, t } = useAuth();
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -21,33 +22,34 @@ export default function RegisterPage() {
     try {
       await register(email, name, password);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "注册失败");
+      toast.error(error instanceof Error ? error.message : t("auth.registerFailed"));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex-1 flex items-center justify-center bg-muted/30">
+    <div className="relative flex-1 flex items-center justify-center bg-muted/30">
+      <PublicLanguageToggle />
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">🏆 Arena</CardTitle>
-          <CardDescription>注册账号</CardDescription>
+          <CardDescription>{t("auth.registerTitle")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">姓名</Label>
+              <Label htmlFor="name">{t("auth.name")}</Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="张三"
+                placeholder={t("auth.namePlaceholder")}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">邮箱</Label>
+              <Label htmlFor="email">{t("auth.email")}</Label>
               <Input
                 id="email"
                 type="email"
@@ -58,7 +60,7 @@ export default function RegisterPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">密码（至少6位）</Label>
+              <Label htmlFor="password">{t("auth.passwordWithMin")}</Label>
               <Input
                 id="password"
                 type="password"
@@ -70,13 +72,13 @@ export default function RegisterPage() {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "注册中..." : "注册"}
+              {loading ? t("auth.registering") : t("auth.registerTitle")}
             </Button>
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            已有账号？{" "}
+            {t("auth.haveAccount")}{" "}
             <Link href="/login" className="underline">
-              登录
+              {t("auth.loginTitle")}
             </Link>
           </p>
         </CardContent>

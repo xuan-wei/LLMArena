@@ -28,7 +28,7 @@ const INSTITUTION_LABELS: Record<string, string> = {
 };
 
 export default function AdminUsersPage() {
-  const { user, loading, authFetch } = useAuth();
+  const { user, loading, authFetch, locale } = useAuth();
   const router = useRouter();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [fetching, setFetching] = useState(true);
@@ -307,7 +307,7 @@ export default function AdminUsersPage() {
                   <TableCell className="text-center text-sm">{u._count.enrollments}</TableCell>
                   <TableCell className="text-center text-sm">{u._count.submissions}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {new Date(u.createdAt).toLocaleDateString("zh-CN")}
+                    {new Date(u.createdAt).toLocaleDateString(locale)}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">

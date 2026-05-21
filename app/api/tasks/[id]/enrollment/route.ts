@@ -2,13 +2,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser } from "@/lib/auth";
 import { ParticipationMode } from "@prisma/client";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = getUser(request);
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  const lang = await getRequestLanguage(request);
+  if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
 
   const { id } = await params;
   const enrollment = await prisma.enrollment.findUnique({
@@ -33,16 +35,17 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = getUser(request);
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  const lang = await getRequestLanguage(request);
+  if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
 
   const { id } = await params;
   const [task, existing] = await Promise.all([
     prisma.task.findUnique({ where: { id } }),
     prisma.enrollment.findUnique({ where: { taskId_userId: { taskId: id, userId: user.sub } } }),
   ]);
-  if (!task) return NextResponse.json({ error: "任务不存在" }, { status: 404 });
-  if (task.status !== "PRELIMINARY") return NextResponse.json({ error: "仅海选阶段可报名" }, { status: 400 });
-  if (existing) return NextResponse.json({ error: "已报名" }, { status: 409 });
+  if (!task) return NextResponse.json({ error: st(lang, "api.taskNotFound") }, { status: 404 });
+  if (task.status !== "PRELIMINARY") return NextResponse.json({ error: st(lang, "api.preliminaryOnlyEnroll") }, { status: 400 });
+  if (existing) return NextResponse.json({ error: st(lang, "api.alreadyEnrolled") }, { status: 409 });
 
   const mode = task.adminLLMEnabled ? "ADMIN_LLM" : "OPENAI_COMPATIBLE";
   const enrollment = await prisma.enrollment.create({ data: { taskId: id, userId: user.sub, mode } });
@@ -54,15 +57,16 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = getUser(request);
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  const lang = await getRequestLanguage(request);
+  if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
 
   const { id } = await params;
   const [enrollment, task] = await Promise.all([
     prisma.enrollment.findUnique({ where: { taskId_userId: { taskId: id, userId: user.sub } } }),
     prisma.task.findUnique({ where: { id } }),
   ]);
-  if (!enrollment) return NextResponse.json({ error: "尚未报名" }, { status: 404 });
-  if (!task) return NextResponse.json({ error: "任务不存在" }, { status: 404 });
+  if (!enrollment) return NextResponse.json({ error: st(lang, "api.enrollmentRequired") }, { status: 404 });
+  if (!task) return NextResponse.json({ error: st(lang, "api.taskNotFound") }, { status: 404 });
 
   // Admin LLM tasks: mode locked, but student can still set their own system prompt
   if (task.adminLLMEnabled) {
@@ -80,9 +84,9 @@ export async function PUT(
   const body = await request.json();
   const { mode, studentLLMConfigId, model, prompt, enableThinking, thinkingBudget, temperature, maxTokens, difyEndpoint, difyApiKey, cozeEndpoint, cozeApiKey, cozeBotId } = body;
 
-  if (!mode) return NextResponse.json({ error: "接入方式不能为空" }, { status: 400 });
+  if (!mode) return NextResponse.json({ error: lang === "zh" ? "接入方式不能为空" : "Connection mode is required" }, { status: 400 });
   if (thinkingBudget != null && Number(thinkingBudget) > 10000) {
-    return NextResponse.json({ error: "thinkingBudget 不能超过 10000" }, { status: 400 });
+    return NextResponse.json({ error: lang === "zh" ? "thinkingBudget 不能超过 10000" : "thinkingBudget cannot exceed 10000" }, { status: 400 });
   }
 
   if (studentLLMConfigId) {
@@ -91,7 +95,7 @@ export async function PUT(
       select: { userId: true },
     });
     if (!cfg || cfg.userId !== user.sub) {
-      return NextResponse.json({ error: "LLM 账号不存在或无权限使用" }, { status: 400 });
+      return NextResponse.json({ error: st(lang, "api.selectLLMAccount") }, { status: 400 });
     }
   }
 
@@ -130,12 +134,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = getUser(request);
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  const lang = await getRequestLanguage(request);
+  if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
 
   const { id } = await params;
   const task = await prisma.task.findUnique({ where: { id } });
-  if (!task) return NextResponse.json({ error: "任务不存在" }, { status: 404 });
-  if (task.status !== "PRELIMINARY") return NextResponse.json({ error: "仅海选阶段可取消报名" }, { status: 400 });
+  if (!task) return NextResponse.json({ error: st(lang, "api.taskNotFound") }, { status: 404 });
+  if (task.status !== "PRELIMINARY" && task.status !== "ENDED") return NextResponse.json({ error: st(lang, "api.withdrawNotAllowed") }, { status: 400 });
 
   await prisma.enrollment.deleteMany({ where: { taskId: id, userId: user.sub } });
   return NextResponse.json({ ok: true });
