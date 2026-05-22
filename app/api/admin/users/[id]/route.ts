@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser, hashPassword } from "@/lib/auth";
 import { cascadeDeleteUsers } from "@/lib/deleteUser";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const lang = await getRequestLanguage(request);
   const user = getUser(request);
-  if (!user || user.role !== "ADMIN") return NextResponse.json({ error: "无权限" }, { status: 403 });
+  if (!user || user.role !== "ADMIN") return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
   const { id } = await params;
   const { name, role, newPassword, canPublish } = await request.json();
   const data: Record<string, unknown> = {};
@@ -14,17 +16,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (canPublish !== undefined) data.canPublish = canPublish;
   const grantingPublish = canPublish === true;
   if (newPassword) {
-    if (newPassword.length < 6) return NextResponse.json({ error: "密码至少6位" }, { status: 400 });
+    if (newPassword.length < 6) return NextResponse.json({ error: st(lang, "auth.passwordTooShort") }, { status: 400 });
     data.passwordHash = await hashPassword(newPassword);
   }
   const updated = await prisma.user.update({ where: { id }, data, select: { id: true, email: true, name: true, role: true } });
   if (grantingPublish) {
+    const targetUser = await prisma.user.findUnique({ where: { id }, select: { language: true } });
+    const targetLang = targetUser?.language === "zh" ? "zh" : "en";
     await prisma.notification.create({
       data: {
         userId: id,
         type: "PUBLISHER_GRANTED",
-        title: "发布权限已授予",
-        body: "管理员已为您授予发布权限，现在可以创建和发布活动。",
+        title: st(targetLang, "api.publisherGrantedTitle"),
+        body: st(targetLang, "api.publisherGrantedBody"),
       },
     });
   }
@@ -32,10 +36,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const lang = await getRequestLanguage(request);
   const user = getUser(request);
-  if (!user || user.role !== "ADMIN") return NextResponse.json({ error: "无权限" }, { status: 403 });
+  if (!user || user.role !== "ADMIN") return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
   const { id } = await params;
-  if (id === user.sub) return NextResponse.json({ error: "不能删除自己" }, { status: 400 });
+  if (id === user.sub) return NextResponse.json({ error: st(lang, "api.cannotDeleteSelf") }, { status: 400 });
   await cascadeDeleteUsers([id]);
   return NextResponse.json({ ok: true });
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser, getUserFresh } from "@/lib/auth";
-import { canPublishTasks } from "@/lib/permissions";
+import { canPublishTasks, isAdmin } from "@/lib/permissions";
 import { getRequestLanguage, st } from "@/lib/i18n/server";
 import { defaultJudgeTemplate, objectiveTemplate, subjectiveTemplate } from "@/lib/i18n/templates";
 
@@ -33,6 +33,17 @@ export async function POST(request: Request) {
   const { name, llmConfigId, studentLLMConfigId, model, type, systemPrompt, enableThinking, thinkingBudget, temperature, maxTokens } = await request.json();
   if (!name) {
     return NextResponse.json({ error: st(lang, "api.nameRequired") }, { status: 400 });
+  }
+
+  if (llmConfigId) {
+    const cfg = await prisma.lLMConfig.findUnique({ where: { id: llmConfigId }, select: { createdBy: true } });
+    if (!cfg || (!isAdmin(user) && cfg.createdBy !== user.sub))
+      return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
+  }
+  if (studentLLMConfigId) {
+    const cfg = await prisma.studentLLMConfig.findUnique({ where: { id: studentLLMConfigId }, select: { userId: true } });
+    if (!cfg || (!isAdmin(user) && cfg.userId !== user.sub))
+      return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
   }
 
   const defaultPrompt = defaultJudgeTemplate(lang, type);

@@ -2,14 +2,16 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser } from "@/lib/auth";
 import { submissionQueue } from "@/lib/queue";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const lang = await getRequestLanguage(request);
   const user = getUser(request);
   if (!user || user.role !== "ADMIN") {
-    return NextResponse.json({ error: "无权限" }, { status: 403 });
+    return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
   }
 
   const { id } = await params;
@@ -28,8 +30,8 @@ export async function POST(
     return "OK";
   });
 
-  if (result === "NOT_FOUND") return NextResponse.json({ error: "不存在" }, { status: 404 });
-  if (result === "INVALID_STATUS") return NextResponse.json({ error: "只能重跑失败的提交" }, { status: 400 });
+  if (result === "NOT_FOUND") return NextResponse.json({ error: st(lang, "api.notFound") }, { status: 404 });
+  if (result === "INVALID_STATUS") return NextResponse.json({ error: st(lang, "api.canOnlyRetryFailed") }, { status: 400 });
 
   submissionQueue.enqueue(id);
 

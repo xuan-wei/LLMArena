@@ -411,10 +411,6 @@ function ChatbotTab({
 }) {
   const tr = useSystemText();
 
-  if (task.adminLLMEnabled) {
-    return <AdminLLMChatbotCard task={task} />;
-  }
-
   const [mode, setMode] = useState(
     (enrollment.mode && enrollment.mode !== "ADMIN_LLM") ? enrollment.mode : "OPENAI_COMPATIBLE"
   );
@@ -432,6 +428,10 @@ function ChatbotTab({
   const [saving, setSaving] = useState(false);
   const [validating, setValidating] = useState(false);
   const [testDialog, setTestDialog] = useState<{ open: boolean; status: "testing" | "success" | "fail"; message?: string; preview?: string }>({ open: false, status: "testing" });
+
+  if (task.adminLLMEnabled) {
+    return <AdminLLMChatbotCard task={task} />;
+  }
 
   const selectedCfg = llmConfigs.find((c) => c.id === selectedConfigId);
   const availableModels = selectedCfg?.models.split(",").map((m) => m.trim()).filter(Boolean) ?? [];

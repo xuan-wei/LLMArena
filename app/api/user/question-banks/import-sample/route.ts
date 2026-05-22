@@ -1,23 +1,25 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser } from "@/lib/auth";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function POST(request: Request) {
+  const lang = await getRequestLanguage(request);
   const user = getUser(request);
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
 
   const { bankId } = await request.json();
-  if (!bankId) return NextResponse.json({ error: "缺少 bankId" }, { status: 400 });
+  if (!bankId) return NextResponse.json({ error: st(lang, "api.missingBankId") }, { status: 400 });
 
   const source = await prisma.questionBank.findFirst({
     where: { id: bankId, isSample: true },
     include: { items: { orderBy: { orderIndex: "asc" } } },
   });
-  if (!source) return NextResponse.json({ error: "样例题库不存在" }, { status: 404 });
+  if (!source) return NextResponse.json({ error: st(lang, "api.sampleBankNotFound") }, { status: 404 });
 
   const newBank = await prisma.questionBank.create({
     data: {
-      name: `${source.name}【来自样例题库】`,
+      name: `${source.name}${st(lang, "api.importedFromSample")}`,
       description: source.description,
       isSample: false,
       createdBy: user.sub,

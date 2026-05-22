@@ -2,6 +2,18 @@ import nodemailer from "nodemailer";
 import { prisma } from "@/lib/prisma";
 import { normalizeLanguage } from "@/lib/i18n";
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function sanitizeUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") return parsed.href;
+  } catch {}
+  return "#";
+}
+
 function contactEmail() {
   return process.env.SMTP_FROM ?? process.env.SMTP_USER ?? "admin";
 }
@@ -38,8 +50,8 @@ export async function sendWelcomeEmail(to: string, name: string, language: unkno
     to,
     lang === "zh" ? "欢迎加入 LLM Arena" : "Welcome to LLM Arena",
     lang === "zh"
-      ? `<p>你好 ${name}，</p><p>欢迎加入 LLM Arena 大模型竞技场！登录后即可参与活动。</p><p>如有问题请联系 <a href="mailto:${contactEmail()}">${contactEmail()}</a></p>`
-      : `<p>Hello ${name},</p><p>Welcome to LLM Arena. You can sign in and join activities now.</p><p>If you have questions, contact <a href="mailto:${contactEmail()}">${contactEmail()}</a>.</p>`,
+      ? `<p>你好 ${escapeHtml(name)}，</p><p>欢迎加入 LLM Arena 大模型竞技场！登录后即可参与活动。</p><p>如有问题请联系 <a href="mailto:${contactEmail()}">${contactEmail()}</a></p>`
+      : `<p>Hello ${escapeHtml(name)},</p><p>Welcome to LLM Arena. You can sign in and join activities now.</p><p>If you have questions, contact <a href="mailto:${contactEmail()}">${contactEmail()}</a>.</p>`,
   );
 }
 
@@ -49,8 +61,8 @@ export async function sendPublisherGrantedEmail(to: string, name: string, langua
     to,
     lang === "zh" ? "【LLM Arena】发布权限已审批通过" : "[LLM Arena] Publisher access approved",
     lang === "zh"
-      ? `<p>你好 ${name}，</p><p>您的发布权限申请已审批通过，现在可以在平台上创建和发布活动。</p><p>如有问题请联系 <a href="mailto:${contactEmail()}">${contactEmail()}</a></p>`
-      : `<p>Hello ${name},</p><p>Your publisher access request has been approved. You can now create and publish activities.</p><p>If you have questions, contact <a href="mailto:${contactEmail()}">${contactEmail()}</a>.</p>`,
+      ? `<p>你好 ${escapeHtml(name)}，</p><p>您的发布权限申请已审批通过，现在可以在平台上创建和发布活动。</p><p>如有问题请联系 <a href="mailto:${contactEmail()}">${contactEmail()}</a></p>`
+      : `<p>Hello ${escapeHtml(name)},</p><p>Your publisher access request has been approved. You can now create and publish activities.</p><p>If you have questions, contact <a href="mailto:${contactEmail()}">${contactEmail()}</a>.</p>`,
   );
 }
 
@@ -60,20 +72,32 @@ export async function sendPublisherRejectedEmail(to: string, name: string, reaso
     to,
     lang === "zh" ? "【LLM Arena】发布权限申请未通过" : "[LLM Arena] Publisher access request rejected",
     lang === "zh"
-      ? `<p>你好 ${name}，</p><p>很遗憾，您的发布权限申请未通过审核。${reason ? `<br/>原因：${reason}` : ""}</p><p>如有疑问请联系 <a href="mailto:${contactEmail()}">${contactEmail()}</a></p>`
-      : `<p>Hello ${name},</p><p>Unfortunately, your publisher access request was rejected.${reason ? `<br/>Reason: ${reason}` : ""}</p><p>If you have questions, contact <a href="mailto:${contactEmail()}">${contactEmail()}</a>.</p>`,
+      ? `<p>你好 ${escapeHtml(name)}，</p><p>很遗憾，您的发布权限申请未通过审核。${reason ? `<br/>原因：${escapeHtml(reason)}` : ""}</p><p>如有疑问请联系 <a href="mailto:${contactEmail()}">${contactEmail()}</a></p>`
+      : `<p>Hello ${escapeHtml(name)},</p><p>Unfortunately, your publisher access request was rejected.${reason ? `<br/>Reason: ${escapeHtml(reason)}` : ""}</p><p>If you have questions, contact <a href="mailto:${contactEmail()}">${contactEmail()}</a>.</p>`,
   );
 }
 
-export async function sendAdminNewApplicationEmail(adminEmails: string[], applicantName: string, language: unknown = "en") {
+export async function sendAdminNewApplicationEmail(
+  adminEmails: string[],
+  applicantName: string,
+  details: { institution: string; homepage?: string | null; purpose: string },
+  language: unknown = "en",
+) {
   if (adminEmails.length === 0) return;
   const lang = normalizeLanguage(language);
+  const { institution, homepage, purpose } = details;
+  const safeInstitution = escapeHtml(institution);
+  const safePurpose = escapeHtml(purpose);
+  const safeName = escapeHtml(applicantName);
+  const homepageRow = homepage
+    ? (lang === "zh" ? `<li><strong>个人主页：</strong><a href="${sanitizeUrl(homepage)}">${escapeHtml(homepage)}</a></li>` : `<li><strong>Homepage:</strong> <a href="${sanitizeUrl(homepage)}">${escapeHtml(homepage)}</a></li>`)
+    : "";
   await sendEmail(
     adminEmails.join(","),
     lang === "zh" ? "【LLM Arena】收到新的发布权限申请" : "[LLM Arena] New publisher access request",
     lang === "zh"
-      ? `<p>用户 <strong>${applicantName}</strong> 提交了发布权限申请，请登录管理控制台审批。</p>`
-      : `<p>User <strong>${applicantName}</strong> submitted a publisher access request. Please sign in to the admin console to review it.</p>`,
+      ? `<p>用户 <strong>${safeName}</strong> 提交了发布权限申请，详情如下：</p><ul><li><strong>所属机构：</strong>${safeInstitution}</li>${homepageRow}<li><strong>申请用途：</strong>${safePurpose}</li></ul><p>请登录管理控制台审批。</p>`
+      : `<p>User <strong>${safeName}</strong> submitted a publisher access request:</p><ul><li><strong>Institution:</strong> ${safeInstitution}</li>${homepageRow}<li><strong>Purpose:</strong> ${safePurpose}</li></ul><p>Please sign in to the admin console to review it.</p>`,
   );
 }
 
@@ -83,7 +107,7 @@ export async function sendPasswordResetEmail(to: string, name: string, resetLink
     to,
     lang === "zh" ? "【LLM Arena】重置密码" : "[LLM Arena] Reset your password",
     lang === "zh"
-      ? `<p>你好 ${name}，</p><p>您请求了重置密码。点击以下链接在 1 小时内完成密码重置：</p><p><a href="${resetLink}">${resetLink}</a></p><p>如果您没有发起此请求，请忽略此邮件。</p>`
-      : `<p>Hello ${name},</p><p>You requested a password reset. Click the link below within 1 hour to reset your password:</p><p><a href="${resetLink}">${resetLink}</a></p><p>If you did not request this, please ignore this email.</p>`,
+      ? `<p>你好 ${escapeHtml(name)}，</p><p>您请求了重置密码。点击以下链接在 1 小时内完成密码重置：</p><p><a href="${sanitizeUrl(resetLink)}">${escapeHtml(resetLink)}</a></p><p>如果您没有发起此请求，请忽略此邮件。</p>`
+      : `<p>Hello ${escapeHtml(name)},</p><p>You requested a password reset. Click the link below within 1 hour to reset your password:</p><p><a href="${sanitizeUrl(resetLink)}">${escapeHtml(resetLink)}</a></p><p>If you did not request this, please ignore this email.</p>`,
   );
 }

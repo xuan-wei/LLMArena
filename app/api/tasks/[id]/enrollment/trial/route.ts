@@ -4,17 +4,19 @@ import OpenAI from "openai";
 import { callDifyStream } from "@/lib/chatbot/difyMode";
 import { callCoze } from "@/lib/chatbot/cozeMode";
 import type { ChatbotConfig } from "@/lib/chatbot";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const lang = await getRequestLanguage(request);
   const user = getUser(request);
-  if (!user) return new Response(JSON.stringify({ error: "未登录" }), { status: 401 });
+  if (!user) return new Response(JSON.stringify({ error: st(lang, "auth.notLoggedIn") }), { status: 401 });
 
   const { id } = await params;
   const { questionId, prompt: promptOverride } = await request.json();
-  if (!questionId) return new Response(JSON.stringify({ error: "缺少 questionId" }), { status: 400 });
+  if (!questionId) return new Response(JSON.stringify({ error: st(lang, "api.missingQuestionId") }), { status: 400 });
 
   const enrollment = await prisma.enrollment.findUnique({
     where: { taskId_userId: { taskId: id, userId: user.sub } },
@@ -23,15 +25,15 @@ export async function POST(
       task: { include: { adminStudentLLMConfig: true } },
     },
   });
-  if (!enrollment) return new Response(JSON.stringify({ error: "尚未报名" }), { status: 403 });
+  if (!enrollment) return new Response(JSON.stringify({ error: st(lang, "api.notEnrolled") }), { status: 403 });
   if (enrollment.task.status === "FINALS" && !enrollment.isFinalist) {
-    return new Response(JSON.stringify({ error: "您未晋级终赛，无法试跑" }), { status: 403 });
+    return new Response(JSON.stringify({ error: st(lang, "api.notFinalistCannotTrial") }), { status: 403 });
   }
 
   const question = await prisma.question.findFirst({
     where: { id: questionId, taskId: id, split: "TRAIN" },
   });
-  if (!question) return new Response(JSON.stringify({ error: "题目不存在或非公开题目" }), { status: 404 });
+  if (!question) return new Response(JSON.stringify({ error: st(lang, "api.questionNotFoundOrNotPublic") }), { status: 404 });
 
   // Build chatbot config (same logic as validate route)
   let chatbotConfig: ChatbotConfig;
@@ -39,7 +41,7 @@ export async function POST(
   if (enrollment.task.adminLLMEnabled) {
     const cfg = enrollment.task.adminStudentLLMConfig;
     if (!cfg || !cfg.apiBaseUrl || !cfg.apiKey || !enrollment.task.adminModel) {
-      return new Response(JSON.stringify({ error: "管理员尚未完成 LLM 配置" }), { status: 400 });
+      return new Response(JSON.stringify({ error: st(lang, "api.adminLLMNotConfigured") }), { status: 400 });
     }
     chatbotConfig = {
       mode: "OPENAI_COMPATIBLE",
@@ -54,7 +56,7 @@ export async function POST(
   } else if (enrollment.mode === "OPENAI_COMPATIBLE") {
     const cfg = enrollment.studentLLMConfig;
     if (!cfg || !cfg.apiBaseUrl || !cfg.apiKey || !enrollment.model) {
-      return new Response(JSON.stringify({ error: "LLM 配置不完整，请先完成 Chatbot 配置" }), { status: 400 });
+      return new Response(JSON.stringify({ error: st(lang, "api.llmConfigIncomplete") }), { status: 400 });
     }
     chatbotConfig = {
       mode: "OPENAI_COMPATIBLE",
@@ -68,12 +70,12 @@ export async function POST(
     };
   } else if (enrollment.mode === "DIFY") {
     if (!enrollment.difyEndpoint || !enrollment.difyApiKey) {
-      return new Response(JSON.stringify({ error: "Dify 配置不完整" }), { status: 400 });
+      return new Response(JSON.stringify({ error: st(lang, "api.difyConfigIncomplete") }), { status: 400 });
     }
     chatbotConfig = { mode: "DIFY", difyEndpoint: enrollment.difyEndpoint, difyApiKey: enrollment.difyApiKey };
   } else {
     if (!enrollment.cozeEndpoint || !enrollment.cozeApiKey || !enrollment.cozeBotId) {
-      return new Response(JSON.stringify({ error: "Coze 配置不完整" }), { status: 400 });
+      return new Response(JSON.stringify({ error: st(lang, "api.cozeConfigIncomplete") }), { status: 400 });
     }
     chatbotConfig = { mode: "COZE", cozeEndpoint: enrollment.cozeEndpoint, cozeApiKey: enrollment.cozeApiKey, cozeBotId: enrollment.cozeBotId };
   }
@@ -84,7 +86,7 @@ export async function POST(
     data: { trialRunsUsed: { increment: 1 } },
   });
   if (updated.count === 0) {
-    return new Response(JSON.stringify({ error: `试跑次数已用完（上限 ${enrollment.task.maxTrialRuns} 次）` }), { status: 429 });
+    return new Response(JSON.stringify({ error: st(lang, "api.trialRunsExhausted", { count: String(enrollment.task.maxTrialRuns) }) }), { status: 429 });
   }
 
   const enc = new TextEncoder();
@@ -166,7 +168,7 @@ export async function POST(
           send(controller, { type: "done", output: result.output, thinking: "" });
         }
       } catch (e) {
-        send(controller, { type: "error", message: e instanceof Error ? e.message : "调用失败" });
+        send(controller, { type: "error", message: e instanceof Error ? e.message : st(lang, "api.callFailed") });
       }
       controller.close();
     },

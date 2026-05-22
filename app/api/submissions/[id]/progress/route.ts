@@ -54,7 +54,7 @@ export async function GET(
           clearInterval(interval);
           writer.close().catch(() => {});
         } else if (lastKey !== "waiting") {
-          send({ done: false, completed: 0, total: 0, currentQuestion: "等待中..." });
+          send({ done: false, completed: 0, total: 0, currentQuestion: "Waiting..." });
           lastKey = "waiting";
         }
         return;

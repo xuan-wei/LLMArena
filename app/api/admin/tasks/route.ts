@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser, getUserFresh } from "@/lib/auth";
-import { canPublishTasks } from "@/lib/permissions";
+import { canPublishTasks, isAdmin } from "@/lib/permissions";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function GET(request: Request) {
   const user = await getUserFresh(request);
+  const lang = await getRequestLanguage(request);
   if (!canPublishTasks(user)) {
-    return NextResponse.json({ error: "无权限" }, { status: 403 });
+    return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
   }
 
   // Every user sees only their own tasks
@@ -26,8 +28,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const user = await getUserFresh(request);
+  const lang = await getRequestLanguage(request);
   if (!canPublishTasks(user)) {
-    return NextResponse.json({ error: "无权限" }, { status: 403 });
+    return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
   }
 
   try {
@@ -38,7 +41,18 @@ export async function POST(request: Request) {
     } = body;
 
     if (!title) {
-      return NextResponse.json({ error: "标题不能为空" }, { status: 400 });
+      return NextResponse.json({ error: st(lang, "api.nameRequired") }, { status: 400 });
+    }
+
+    if (judgeProfileId) {
+      const jp = await prisma.judgeProfile.findUnique({ where: { id: judgeProfileId }, select: { createdBy: true } });
+      if (!jp || (!isAdmin(user) && jp.createdBy !== user.sub))
+        return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
+    }
+    if (adminLLMEnabled && adminStudentLLMConfigId) {
+      const cfg = await prisma.studentLLMConfig.findUnique({ where: { id: adminStudentLLMConfigId }, select: { userId: true } });
+      if (!cfg || (!isAdmin(user) && cfg.userId !== user.sub))
+        return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
     }
 
     // Validate bank ownership before creating the task
@@ -51,7 +65,7 @@ export async function POST(request: Request) {
         },
         include: { items: { orderBy: { orderIndex: "asc" } } },
       });
-      if (!bank) return NextResponse.json({ error: "题库不存在或无权限" }, { status: 400 });
+      if (!bank) return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 400 });
       bankItems = bank.items;
     }
 
@@ -88,6 +102,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ task }, { status: 201 });
   } catch (error) {
     console.error("Create task error:", error);
-    return NextResponse.json({ error: "创建任务失败" }, { status: 500 });
+    return NextResponse.json({ error: st(lang, "api.cloneFailed") }, { status: 500 });
   }
 }

@@ -2,18 +2,20 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser, getUserFresh } from "@/lib/auth";
 import { canManageTask } from "@/lib/permissions";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const lang = await getRequestLanguage(request);
   const user = await getUserFresh(request);
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
 
   const { id } = await params;
   const task = await prisma.task.findUnique({ where: { id }, select: { createdBy: true } });
-  if (!task) return NextResponse.json({ error: "任务不存在" }, { status: 404 });
-  if (!canManageTask(user, task.createdBy)) return NextResponse.json({ error: "无权限" }, { status: 403 });
+  if (!task) return NextResponse.json({ error: st(lang, "api.taskNotFound") }, { status: 404 });
+  if (!canManageTask(user, task.createdBy)) return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
 
   const body = await request.json() as {
     bankId?: string;       // existing bank id
@@ -34,7 +36,7 @@ export async function POST(
         ],
       },
     });
-    if (!bank) return NextResponse.json({ error: "题库不存在或无权限" }, { status: 404 });
+    if (!bank) return NextResponse.json({ error: st(lang, "api.bankNotFoundOrNoPermission") }, { status: 404 });
     bankId = bank.id;
   } else if (body.bankName?.trim()) {
     // Create new personal bank
@@ -47,7 +49,7 @@ export async function POST(
     });
     bankId = bank.id;
   } else {
-    return NextResponse.json({ error: "请提供 bankId 或 bankName" }, { status: 400 });
+    return NextResponse.json({ error: st(lang, "api.provideBankIdOrName") }, { status: 400 });
   }
 
   const questions = await prisma.question.findMany({
@@ -58,7 +60,7 @@ export async function POST(
     orderBy: { orderIndex: "asc" },
   });
 
-  if (questions.length === 0) return NextResponse.json({ error: "没有可保存的题目" }, { status: 400 });
+  if (questions.length === 0) return NextResponse.json({ error: st(lang, "api.noQuestionsToSave") }, { status: 400 });
 
   const existing = await prisma.questionBankItem.count({ where: { bankId } });
   await prisma.questionBankItem.createMany({

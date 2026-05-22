@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser, getUserFresh } from "@/lib/auth";
 import { canManageTask } from "@/lib/permissions";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 function csvEscape(s: string): string {
   if (s.includes(",") || s.includes('"') || s.includes("\n")) {
@@ -14,13 +15,14 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const lang = await getRequestLanguage(request);
   const user = await getUserFresh(request);
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
 
   const { id } = await params;
   const task = await prisma.task.findUnique({ where: { id }, select: { createdBy: true, title: true } });
-  if (!task) return NextResponse.json({ error: "任务不存在" }, { status: 404 });
-  if (!canManageTask(user, task.createdBy)) return NextResponse.json({ error: "无权限" }, { status: 403 });
+  if (!task) return NextResponse.json({ error: st(lang, "api.taskNotFound") }, { status: 404 });
+  if (!canManageTask(user, task.createdBy)) return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
 
   const questions = await prisma.question.findMany({
     where: { taskId: id },

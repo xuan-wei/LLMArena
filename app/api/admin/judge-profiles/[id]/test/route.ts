@@ -49,7 +49,7 @@ export async function POST(
     : null;
 
   if (!llmCreds || !profile.model) {
-    const msg = lang === "zh" ? "未配置 LLM 账号或模型" : "LLM account or model is not configured";
+    const msg = st(lang, "api.llmNotConfigured");
     await prisma.judgeProfile.update({
       where: { id },
       data: { lastTestStatus: "failed", lastTestedAt: new Date(), lastTestMessage: msg },
@@ -96,7 +96,7 @@ export async function POST(
 
     return NextResponse.json({ ok: true, response: content });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "调用失败";
+    const msg = error instanceof Error ? error.message : st(lang, "api.callFailed");
     await prisma.judgeProfile.update({
       where: { id },
       data: { lastTestStatus: "failed", lastTestedAt: new Date(), lastTestMessage: msg.slice(0, 500) },

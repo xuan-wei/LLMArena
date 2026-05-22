@@ -20,6 +20,18 @@ export async function PUT(
   }
 
   const { name, llmConfigId, studentLLMConfigId, model, type, systemPrompt, enableThinking, thinkingBudget, temperature, maxTokens } = await request.json();
+
+  if (llmConfigId) {
+    const cfg = await prisma.lLMConfig.findUnique({ where: { id: llmConfigId }, select: { createdBy: true } });
+    if (!cfg || (!isAdmin(user) && cfg.createdBy !== user.sub))
+      return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
+  }
+  if (studentLLMConfigId) {
+    const cfg = await prisma.studentLLMConfig.findUnique({ where: { id: studentLLMConfigId }, select: { userId: true } });
+    if (!cfg || (!isAdmin(user) && cfg.userId !== user.sub))
+      return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
+  }
+
   const updated = await prisma.judgeProfile.update({
     where: { id },
     data: {
@@ -61,14 +73,6 @@ export async function DELETE(
   if (taskCount > 0) {
     return NextResponse.json(
       { error: st(lang, "api.judgeProfileInUse", { count: taskCount }) },
-      { status: 400 },
-    );
-  }
-
-  const taskCount = await prisma.task.count({ where: { judgeProfileId: id } });
-  if (taskCount > 0) {
-    return NextResponse.json(
-      { error: `该评分器已被 ${taskCount} 个活动使用，无法删除` },
       { status: 400 },
     );
   }

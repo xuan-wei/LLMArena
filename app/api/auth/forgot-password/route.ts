@@ -19,7 +19,7 @@ export async function POST(request: Request) {
 
   if (!process.env.SMTP_HOST) {
     return NextResponse.json(
-      { error: lang === "zh" ? "邮件服务未配置，请联系管理员" : "Email service is not configured. Please contact the administrator." },
+      { error: st(lang, "api.smtpNotConfigured") },
       { status: 503 },
     );
   }

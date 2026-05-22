@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser } from "@/lib/auth";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 const ALLOWED_KEYS = [
   "SYSTEM_LLM_BASE_URL",
@@ -13,9 +14,10 @@ const ALLOWED_KEYS = [
 ];
 
 export async function GET(request: Request) {
+  const lang = await getRequestLanguage(request);
   const user = getUser(request);
   if (!user || user.role !== "ADMIN") {
-    return NextResponse.json({ error: "无权限" }, { status: 403 });
+    return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
   }
 
   const configs = await prisma.systemConfig.findMany({
@@ -31,15 +33,16 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const lang = await getRequestLanguage(request);
   const user = getUser(request);
   if (!user || user.role !== "ADMIN") {
-    return NextResponse.json({ error: "无权限" }, { status: 403 });
+    return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
   }
 
   const { key, value } = await request.json();
 
   if (!ALLOWED_KEYS.includes(key)) {
-    return NextResponse.json({ error: "无效的配置项" }, { status: 400 });
+    return NextResponse.json({ error: st(lang, "api.invalidConfigKey") }, { status: 400 });
   }
 
   await prisma.systemConfig.upsert({

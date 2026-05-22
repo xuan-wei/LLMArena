@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function GET(request: Request) {
+  const lang = await getRequestLanguage(request);
   const user = getUser(request);
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
 
   // Return tasks the user can see:
   //   1. Tasks they are enrolled in (subscribed), status != DRAFT

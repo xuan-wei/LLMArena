@@ -7,35 +7,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Navbar } from "@/components/layout/Navbar";
 import { FileCheck, Library, SlidersHorizontal, Users } from "lucide-react";
 
-const items = [
-  {
-    href: "/admin/users",
-    title: "用户管理",
-    desc: "管理用户角色、发布权限和账号状态",
-    icon: Users,
-  },
-  {
-    href: "/admin/publisher-applications",
-    title: "发布权限审批",
-    desc: "审核教师或发布者提交的活动发布申请",
-    icon: FileCheck,
-  },
-  {
-    href: "/admin/question-banks",
-    title: "样例题库管理",
-    desc: "维护可供教师导入的公共样例题库",
-    icon: Library,
-  },
-  {
-    href: "/admin/config",
-    title: "系统全局设置",
-    desc: "配置站点公告、页脚等全局参数",
-    icon: SlidersHorizontal,
-  },
-];
-
 export default function AdminPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, t } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -47,13 +20,40 @@ export default function AdminPage() {
 
   if (loading || !user || user.role !== "ADMIN") return <div><Navbar /></div>;
 
+  const items = [
+    {
+      href: "/admin/users",
+      title: t("nav.users"),
+      desc: t("admin.usersDesc"),
+      icon: Users,
+    },
+    {
+      href: "/admin/publisher-applications",
+      title: t("nav.publisherApplications"),
+      desc: t("admin.publisherApplicationsDesc"),
+      icon: FileCheck,
+    },
+    {
+      href: "/admin/question-banks",
+      title: t("nav.sampleQuestionBanks"),
+      desc: t("admin.questionBanksDesc"),
+      icon: Library,
+    },
+    {
+      href: "/admin/config",
+      title: t("nav.systemConfig"),
+      desc: t("admin.systemConfigDesc"),
+      icon: SlidersHorizontal,
+    },
+  ];
+
   return (
     <div>
-      <Navbar breadcrumbs={[{ label: "管理控制台" }]} />
+      <Navbar breadcrumbs={[{ label: t("nav.admin") }]} />
       <main className="mx-auto max-w-5xl px-4 py-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold">管理控制台</h1>
-          <p className="mt-1 text-sm text-muted-foreground">集中查看用户、审批、样例题库和全局设置入口。</p>
+          <h1 className="text-2xl font-bold">{t("nav.admin")}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{t("admin.consoleDesc")}</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           {items.map(({ href, title, desc, icon: Icon }) => (

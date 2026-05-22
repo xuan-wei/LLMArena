@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function GET(request: Request) {
+  const lang = await getRequestLanguage(request);
   const user = getUser(request);
-  if (!isAdmin(user)) return NextResponse.json({ error: "无权限" }, { status: 403 });
+  if (!isAdmin(user)) return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
 
   const url = new URL(request.url);
   const status = url.searchParams.get("status"); // PENDING | APPROVED | REJECTED | null (all)

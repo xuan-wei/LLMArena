@@ -10,15 +10,40 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { toast } from "sonner";
 
 export default function SettingsPage() {
-  const { user, loading, authFetch, setLanguage, t } = useAuth();
+  const { user, loading, authFetch, setLanguage, t, refreshUser } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
   }, [user, loading, router]);
+  const [displayName, setDisplayName] = useState("");
+  const [savingName, setSavingName] = useState(false);
   const [form, setForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+
+  useEffect(() => {
+    if (user?.name) setDisplayName(user.name);
+  }, [user?.name]);
   const [saving, setSaving] = useState(false);
   const [sendingReset, setSendingReset] = useState(false);
+
+  const saveDisplayName = async () => {
+    if (!displayName.trim()) return toast.error(t("account.settings.nameEmpty"));
+    setSavingName(true);
+    try {
+      const res = await authFetch("/api/account/profile", {
+        method: "PUT",
+        body: JSON.stringify({ name: displayName.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      await refreshUser();
+      toast.success(t("account.settings.nameSaved"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("config.saveFailed"));
+    } finally {
+      setSavingName(false);
+    }
+  };
 
   const changePassword = async () => {
     if (!form.currentPassword || !form.newPassword) return toast.error(t("account.settings.fillBoth"));
@@ -65,6 +90,25 @@ export default function SettingsPage() {
       <Navbar backHref="/account" backLabel={t("account.center")} breadcrumbs={[{ label: t("account.settings.title") }]} />
       <main className="max-w-lg mx-auto px-4 py-8 space-y-6">
         <h1 className="text-2xl font-bold">{t("account.settings.title")}</h1>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("account.settings.displayName")}</CardTitle>
+            <CardDescription>{t("account.settings.displayNameDesc")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Input
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder={t("account.settings.displayNamePlaceholder")}
+              maxLength={50}
+              onKeyDown={(e) => e.key === "Enter" && saveDisplayName()}
+            />
+            <Button onClick={saveDisplayName} disabled={savingName || displayName.trim() === user?.name}>
+              {savingName ? t("common.saving") : t("common.save")}
+            </Button>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

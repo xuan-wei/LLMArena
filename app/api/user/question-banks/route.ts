@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser } from "@/lib/auth";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function GET(request: Request) {
+  const lang = await getRequestLanguage(request);
   const user = getUser(request);
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
 
   const [sampleBanks, personalBanks] = await Promise.all([
     prisma.questionBank.findMany({
@@ -23,11 +25,12 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const lang = await getRequestLanguage(request);
   const user = getUser(request);
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
 
   const { name, description } = await request.json();
-  if (!name?.trim()) return NextResponse.json({ error: "名称不能为空" }, { status: 400 });
+  if (!name?.trim()) return NextResponse.json({ error: st(lang, "api.nameRequired") }, { status: 400 });
 
   const bank = await prisma.questionBank.create({
     data: { name: name.trim(), description: description?.trim() ?? "", isSample: false, createdBy: user.sub },

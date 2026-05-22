@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { getProvider, verifyState, upsertSSOUser } from "@/lib/sso";
 import { signJWT } from "@/lib/auth";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ provider: string }> },
 ) {
+  const lang = await getRequestLanguage(request);
   const { provider: providerId } = await params;
   const url = new URL(request.url);
   const origin = url.origin;
@@ -13,22 +15,22 @@ export async function GET(
 
   const provider = getProvider(providerId);
   if (!provider || !provider.isEnabled()) {
-    return NextResponse.redirect(loginUrl("SSO 提供商不存在或未配置"));
+    return NextResponse.redirect(loginUrl(st(lang, "api.ssoProviderNotFound")));
   }
 
   const errorParam = url.searchParams.get("error");
   if (errorParam) {
-    return NextResponse.redirect(loginUrl("SSO 授权被拒绝"));
+    return NextResponse.redirect(loginUrl(st(lang, "api.ssoAuthDenied")));
   }
 
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   if (!code || !state) {
-    return NextResponse.redirect(loginUrl("缺少必要参数"));
+    return NextResponse.redirect(loginUrl(st(lang, "api.ssoMissingParams")));
   }
 
   if (!verifyState(state)) {
-    return NextResponse.redirect(loginUrl("状态验证失败，请重试"));
+    return NextResponse.redirect(loginUrl(st(lang, "api.ssoStateVerifyFailed")));
   }
 
   // Use the configured redirect URI (env var) for token exchange — must match
@@ -52,7 +54,7 @@ export async function GET(
     institutionId = result.institutionId;
     providerEmail = result.email;
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "获取用户信息失败";
+    const msg = e instanceof Error ? e.message : st(lang, "api.ssoUserInfoFailed");
     return NextResponse.redirect(`${userOrigin}/login?error=${encodeURIComponent(msg)}`);
   }
 

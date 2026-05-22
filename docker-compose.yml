@@ -17,6 +17,12 @@ services:
       JACCOUNT_REDIRECT_URI: ${JACCOUNT_REDIRECT_URI:-}
       FOOTER_COPYRIGHT: ${FOOTER_COPYRIGHT:-}
       FOOTER_ICP: ${FOOTER_ICP:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_SECURE: ${SMTP_SECURE:-true}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
       # Per-LLM-account concurrent call limit. Submissions sharing the same LLM
       # account share this pool; different LLM accounts are fully independent.
       LLM_CONCURRENCY: ${LLM_CONCURRENCY:-15}

@@ -2,19 +2,21 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUserFresh } from "@/lib/auth";
 import { sendAdminNewApplicationEmail } from "@/lib/email";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function POST(request: Request) {
+  const lang = await getRequestLanguage(request);
   const user = await getUserFresh(request);
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
 
   // Admins and existing publishers don't need to apply
   if (user.role === "ADMIN" || user.canPublish) {
-    return NextResponse.json({ error: "已拥有发布权限" }, { status: 400 });
+    return NextResponse.json({ error: st(lang, "api.alreadyHasPublishPermission") }, { status: 400 });
   }
 
   const { institution, homepage, purpose } = await request.json();
   if (!institution || !purpose) {
-    return NextResponse.json({ error: "机构和申请用途不能为空" }, { status: 400 });
+    return NextResponse.json({ error: st(lang, "api.institutionAndPurposeRequired") }, { status: 400 });
   }
 
   // Check for existing PENDING application
@@ -22,7 +24,7 @@ export async function POST(request: Request) {
     where: { userId: user.sub, status: "PENDING" },
   });
   if (existing) {
-    return NextResponse.json({ error: "已有待审核的申请，请等待审核结果" }, { status: 409 });
+    return NextResponse.json({ error: st(lang, "api.pendingApplicationExists") }, { status: 409 });
   }
 
   const application = await prisma.publisherApplication.create({
@@ -53,15 +55,16 @@ export async function POST(request: Request) {
 
     await Promise.all([
       prisma.notification.createMany({
-        data: admins.map((a) => ({
-          userId: a.id,
-          type: "NEW_APPLICATION",
-          title: a.language === "zh" ? "收到新的发布权限申请" : "New publisher access request",
-          body: a.language === "zh"
-            ? `用户 ${applicant.name} 提交了发布权限申请，请前往管理控制台审批。`
-            : `User ${applicant.name} submitted a publisher access request. Please review it in the admin console.`,
-          refId: application.id,
-        })),
+        data: admins.map((a) => {
+          const aLang = a.language === "zh" ? "zh" : "en";
+          return {
+            userId: a.id,
+            type: "NEW_APPLICATION",
+            title: st(aLang, "api.newApplicationTitle"),
+            body: st(aLang, "api.newApplicationBody", { name: applicant.name }),
+            refId: application.id,
+          };
+        }),
       }),
       emailAdmins.length > 0
         ? Promise.all(
@@ -70,7 +73,7 @@ export async function POST(request: Request) {
               acc[language] ??= [];
               acc[language].push(admin.email);
               return acc;
-            }, {})).map(([language, emails]) => sendAdminNewApplicationEmail(emails, applicant.name, language as "en" | "zh")),
+            }, {})).map(([language, emails]) => sendAdminNewApplicationEmail(emails, applicant.name, { institution, homepage, purpose }, language as "en" | "zh")),
           ).catch(console.error)
         : Promise.resolve(),
     ]);

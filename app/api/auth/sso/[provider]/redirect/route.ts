@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { getProvider, buildState } from "@/lib/sso";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ provider: string }> },
 ) {
+  const lang = await getRequestLanguage(request);
   const { provider: providerId } = await params;
   const provider = getProvider(providerId);
 
   if (!provider || !provider.isEnabled()) {
-    return NextResponse.json({ error: "SSO 提供商不存在或未配置" }, { status: 404 });
+    return NextResponse.json({ error: st(lang, "api.ssoProviderNotFound") }, { status: 404 });
   }
 
   // Build the callback URI from the actual request origin so that JAccount

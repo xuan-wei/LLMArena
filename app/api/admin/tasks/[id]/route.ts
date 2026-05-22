@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser, getUserFresh } from "@/lib/auth";
-import { canManageTask } from "@/lib/permissions";
+import { canManageTask, isAdmin } from "@/lib/permissions";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
-async function getTaskOrForbid(id: string, user: ReturnType<typeof getUser>) {
+async function getTaskOrForbid(id: string, request: Request, user: ReturnType<typeof getUser>) {
+  const lang = await getRequestLanguage(request);
   const task = await prisma.task.findUnique({ where: { id }, select: { createdBy: true } });
-  if (!task) return { error: NextResponse.json({ error: "任务不存在" }, { status: 404 }) };
+  if (!task) return { error: NextResponse.json({ error: st(lang, "api.taskNotFound") }, { status: 404 }) };
   if (!canManageTask(user, task.createdBy)) {
-    return { error: NextResponse.json({ error: "无权限" }, { status: 403 }) };
+    return { error: NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 }) };
   }
-  return { task };
+  return { task, lang };
 }
 
 export async function GET(
@@ -17,8 +19,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await getUserFresh(request);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
-  const check = await getTaskOrForbid(id, user);
+  const check = await getTaskOrForbid(id, request, user);
   if (check.error) return check.error;
 
   const task = await prisma.task.findUnique({
@@ -39,9 +42,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await getUserFresh(request);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
-  const check = await getTaskOrForbid(id, user);
+  const check = await getTaskOrForbid(id, request, user);
   if (check.error) return check.error;
+  const lang = check.lang!;
 
   try {
     const {
@@ -49,6 +54,17 @@ export async function PUT(
       adminLLMEnabled, adminStudentLLMConfigId, adminModel, adminPrompt,
       adminEnableThinking, adminThinkingBudget, adminTemperature, adminMaxTokens,
     } = await request.json();
+
+    if (judgeProfileId) {
+      const jp = await prisma.judgeProfile.findUnique({ where: { id: judgeProfileId }, select: { createdBy: true } });
+      if (!jp || (!isAdmin(user) && jp.createdBy !== user.sub))
+        return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
+    }
+    if (adminStudentLLMConfigId) {
+      const cfg = await prisma.studentLLMConfig.findUnique({ where: { id: adminStudentLLMConfigId }, select: { userId: true } });
+      if (!cfg || (!isAdmin(user) && cfg.userId !== user.sub))
+        return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
+    }
 
     const adminLLMFields =
       adminLLMEnabled === false
@@ -90,7 +106,7 @@ export async function PUT(
     return NextResponse.json({ task });
   } catch (error) {
     console.error("Update task error:", error);
-    return NextResponse.json({ error: "更新任务失败" }, { status: 500 });
+    return NextResponse.json({ error: st(lang, "api.cloneFailed") }, { status: 500 });
   }
 }
 
@@ -99,9 +115,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await getUserFresh(request);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
-  const check = await getTaskOrForbid(id, user);
-  if (check.error) return check.error;
+  const check2 = await getTaskOrForbid(id, request, user);
+  if (check2.error) return check2.error;
 
   try {
     await prisma.$transaction([
@@ -113,6 +130,6 @@ export async function DELETE(
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Delete task error:", error);
-    return NextResponse.json({ error: "删除活动失败" }, { status: 500 });
+    return NextResponse.json({ error: st(check2.lang!, "api.cloneFailed") }, { status: 500 });
   }
 }

@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser } from "@/lib/auth";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const lang = await getRequestLanguage(request);
   const user = getUser(request);
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
 
   const { id } = await params;
   const task = await prisma.task.findUnique({
@@ -24,6 +26,6 @@ export async function GET(
     },
   });
 
-  if (!task) return NextResponse.json({ error: "任务不存在" }, { status: 404 });
+  if (!task) return NextResponse.json({ error: st(lang, "api.taskNotFound") }, { status: 404 });
   return NextResponse.json({ task });
 }

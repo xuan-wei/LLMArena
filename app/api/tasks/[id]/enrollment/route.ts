@@ -84,9 +84,9 @@ export async function PUT(
   const body = await request.json();
   const { mode, studentLLMConfigId, model, prompt, enableThinking, thinkingBudget, temperature, maxTokens, difyEndpoint, difyApiKey, cozeEndpoint, cozeApiKey, cozeBotId } = body;
 
-  if (!mode) return NextResponse.json({ error: lang === "zh" ? "接入方式不能为空" : "Connection mode is required" }, { status: 400 });
+  if (!mode) return NextResponse.json({ error: st(lang, "api.modeRequired") }, { status: 400 });
   if (thinkingBudget != null && Number(thinkingBudget) > 10000) {
-    return NextResponse.json({ error: lang === "zh" ? "thinkingBudget 不能超过 10000" : "thinkingBudget cannot exceed 10000" }, { status: 400 });
+    return NextResponse.json({ error: st(lang, "api.thinkingBudgetLimit") }, { status: 400 });
   }
 
   if (studentLLMConfigId) {

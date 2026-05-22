@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getUserFresh } from "@/lib/auth";
 import { canManageTask } from "@/lib/permissions";
 import { parseCSV } from "@/lib/csv";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 type QSplit = "TRAIN" | "TEST" | "UNUSED";
 
@@ -17,13 +18,14 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const lang = await getRequestLanguage(request);
   const user = await getUserFresh(request);
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
 
   const { id } = await params;
   const _t = await prisma.task.findUnique({ where: { id }, select: { createdBy: true } });
-  if (!_t) return NextResponse.json({ error: "任务不存在" }, { status: 404 });
-  if (!canManageTask(user, _t.createdBy)) return NextResponse.json({ error: "无权限" }, { status: 403 });
+  if (!_t) return NextResponse.json({ error: st(lang, "api.taskNotFound") }, { status: 404 });
+  if (!canManageTask(user, _t.createdBy)) return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
   const body = await request.json();
 
   const existing = await prisma.question.count({ where: { taskId: id } });
@@ -46,8 +48,8 @@ export async function POST(
         },
       },
     });
-    if (!bank) return NextResponse.json({ error: "题库不存在或无权限" }, { status: 404 });
-    if (bank.items.length === 0) return NextResponse.json({ error: "没有可导入的题目" }, { status: 400 });
+    if (!bank) return NextResponse.json({ error: st(lang, "api.bankNotFoundOrNoPermission") }, { status: 404 });
+    if (bank.items.length === 0) return NextResponse.json({ error: st(lang, "api.noQuestionsToImport") }, { status: 400 });
 
     questions = bank.items.map((item, i) => ({
       taskId: id,
@@ -62,7 +64,7 @@ export async function POST(
     const dataRows = rows[0]?.[0]?.toLowerCase() === "question" ? rows.slice(1) : rows;
 
     if (dataRows.length === 0) {
-      return NextResponse.json({ error: "CSV 中没有有效数据行" }, { status: 400 });
+      return NextResponse.json({ error: st(lang, "api.csvNoValidRows") }, { status: 400 });
     }
 
     questions = dataRows
@@ -82,7 +84,7 @@ export async function POST(
       .filter((l: string) => l.length > 0);
 
     if (lines.length === 0) {
-      return NextResponse.json({ error: "没有有效题目" }, { status: 400 });
+      return NextResponse.json({ error: st(lang, "api.noValidQuestions") }, { status: 400 });
     }
 
     questions = lines.map((line: string, i: number) => {
@@ -99,11 +101,11 @@ export async function POST(
       };
     });
   } else {
-    return NextResponse.json({ error: "请提供 text、csv 或 bankId 字段" }, { status: 400 });
+    return NextResponse.json({ error: st(lang, "api.provideTextCsvOrBankId") }, { status: 400 });
   }
 
   if (questions.length === 0) {
-    return NextResponse.json({ error: "没有有效题目" }, { status: 400 });
+    return NextResponse.json({ error: st(lang, "api.noValidQuestions") }, { status: 400 });
   }
 
   await prisma.question.createMany({ data: questions });
@@ -114,13 +116,14 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const lang = await getRequestLanguage(request);
   const user = await getUserFresh(request);
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
 
   const { id } = await params;
   const task = await prisma.task.findUnique({ where: { id }, select: { createdBy: true } });
-  if (!task) return NextResponse.json({ error: "任务不存在" }, { status: 404 });
-  if (!canManageTask(user, task.createdBy)) return NextResponse.json({ error: "无权限" }, { status: 403 });
+  if (!task) return NextResponse.json({ error: st(lang, "api.taskNotFound") }, { status: 404 });
+  if (!canManageTask(user, task.createdBy)) return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
 
   const { mode } = await request.json().catch(() => ({ mode: "all" }));
   // mode: "unused" | "noAnswers" | "all"

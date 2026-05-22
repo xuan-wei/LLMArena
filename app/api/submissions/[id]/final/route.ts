@@ -1,22 +1,24 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser } from "@/lib/auth";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 // POST: toggle isFinal for a submission
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const lang = await getRequestLanguage(request);
   const user = getUser(request);
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
 
   const { id } = await params;
 
   const submission = await prisma.submission.findUnique({ where: { id } });
-  if (!submission) return NextResponse.json({ error: "提交不存在" }, { status: 404 });
-  if (submission.userId !== user.sub) return NextResponse.json({ error: "无权限" }, { status: 403 });
+  if (!submission) return NextResponse.json({ error: st(lang, "api.submissionNotFound") }, { status: 404 });
+  if (submission.userId !== user.sub) return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
   if (submission.status !== "COMPLETED") {
-    return NextResponse.json({ error: "只能选择已完成的提交" }, { status: 400 });
+    return NextResponse.json({ error: st(lang, "api.onlyCompletedCanBeSelected") }, { status: 400 });
   }
 
   const isCurrentlyFinal = submission.isFinal;

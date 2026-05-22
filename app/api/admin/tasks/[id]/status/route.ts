@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser, getUserFresh } from "@/lib/auth";
 import { canManageTask } from "@/lib/permissions";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   DRAFT: ["PRELIMINARY"],
@@ -10,12 +11,20 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   ENDED: ["DRAFT"],
 };
 
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  DRAFT: "status.draft",
+  PRELIMINARY: "status.preliminary",
+  FINALS: "status.finals",
+  ENDED: "status.ended",
+};
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const lang = await getRequestLanguage(request);
   const user = await getUserFresh(request);
-  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
 
   const { id } = await params;
   const { status } = await request.json();
@@ -24,13 +33,15 @@ export async function PATCH(
     where: { id },
     include: { _count: { select: { questions: true } } },
   });
-  if (!task) return NextResponse.json({ error: "任务不存在" }, { status: 404 });
-  if (!canManageTask(user, task.createdBy)) return NextResponse.json({ error: "无权限" }, { status: 403 });
+  if (!task) return NextResponse.json({ error: st(lang, "api.taskNotFound") }, { status: 404 });
+  if (!canManageTask(user, task.createdBy)) return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
 
   const allowed = VALID_TRANSITIONS[task.status] || [];
   if (!allowed.includes(status)) {
+    const fromLabel = st(lang, STATUS_LABEL_KEYS[task.status] as Parameters<typeof st>[1]);
+    const toLabel = st(lang, STATUS_LABEL_KEYS[status] as Parameters<typeof st>[1]);
     return NextResponse.json(
-      { error: `不能从「${STATUS_LABELS[task.status]}」切换到「${STATUS_LABELS[status]}」` },
+      { error: st(lang, "api.cannotTransition", { from: fromLabel, to: toLabel }) },
       { status: 400 }
     );
   }
@@ -51,7 +62,7 @@ export async function PATCH(
 
   // Require at least 1 question before going to PRELIMINARY
   if (status === "PRELIMINARY" && task._count.questions < 1) {
-    return NextResponse.json({ error: "请至少添加 1 道题目才能开始海选" }, { status: 400 });
+    return NextResponse.json({ error: st(lang, "api.needAtLeastOneQuestion") }, { status: 400 });
   }
 
   // PRELIMINARY → FINALS: auto-select top N finalists by private (test) score
@@ -97,10 +108,3 @@ export async function PATCH(
   const updated = await prisma.task.update({ where: { id }, data: { status } });
   return NextResponse.json({ task: updated });
 }
-
-const STATUS_LABELS: Record<string, string> = {
-  DRAFT: "草稿",
-  PRELIMINARY: "海选中",
-  FINALS: "终赛",
-  ENDED: "已结束",
-};

@@ -3,13 +3,15 @@ import { prisma } from "@/lib/prisma";
 import { getUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { sendPublisherGrantedEmail, sendPublisherRejectedEmail } from "@/lib/email";
+import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const lang = await getRequestLanguage(request);
   const user = getUser(request);
-  if (!isAdmin(user)) return NextResponse.json({ error: "无权限" }, { status: 403 });
+  if (!isAdmin(user)) return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
 
   const { id } = await params;
   const application = await prisma.publisherApplication.findUnique({
@@ -19,7 +21,7 @@ export async function GET(
       reviewer: { select: { name: true } },
     },
   });
-  if (!application) return NextResponse.json({ error: "申请不存在" }, { status: 404 });
+  if (!application) return NextResponse.json({ error: st(lang, "api.applicationNotFound") }, { status: 404 });
   return NextResponse.json({ application });
 }
 
@@ -27,8 +29,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const lang = await getRequestLanguage(request);
   const user = getUser(request);
-  if (!isAdmin(user)) return NextResponse.json({ error: "无权限" }, { status: 403 });
+  if (!isAdmin(user)) return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
 
   const { id } = await params;
   const { action, rejectReason } = await request.json() as {
@@ -37,16 +40,17 @@ export async function PATCH(
   };
 
   if (action !== "approve" && action !== "reject") {
-    return NextResponse.json({ error: "action 必须为 approve 或 reject" }, { status: 400 });
+    return NextResponse.json({ error: st(lang, "api.actionMustBeApproveOrReject") }, { status: 400 });
   }
 
   const application = await prisma.publisherApplication.findUnique({ where: { id } });
-  if (!application) return NextResponse.json({ error: "申请不存在" }, { status: 404 });
+  if (!application) return NextResponse.json({ error: st(lang, "api.applicationNotFound") }, { status: 404 });
   if (application.status !== "PENDING") {
-    return NextResponse.json({ error: "该申请已处理" }, { status: 409 });
+    return NextResponse.json({ error: st(lang, "api.applicationAlreadyProcessed") }, { status: 409 });
   }
 
   const appUser = await prisma.user.findUnique({ where: { id: application.userId }, select: { email: true, name: true, language: true } });
+  const userLang = appUser?.language === "zh" ? "zh" : "en";
 
   // Mark all admin notifications about this application as read (notification "ends")
   const markNotificationsRead = prisma.notification.updateMany({
@@ -68,14 +72,14 @@ export async function PATCH(
         data: {
           userId: application.userId,
           type: "PUBLISHER_GRANTED",
-          title: appUser?.language === "zh" ? "发布权限已通过" : "Publisher access approved",
-          body: appUser?.language === "zh" ? "您的发布权限申请已审批通过，现在可以创建和发布活动。" : "Your publisher access request has been approved. You can now create and publish activities.",
+          title: st(userLang, "api.publisherApprovedTitle"),
+          body: st(userLang, "api.publisherApprovedBody"),
         },
       }),
       markNotificationsRead,
     ]);
     if (appUser) {
-      sendPublisherGrantedEmail(appUser.email, appUser.name, appUser.language === "zh" ? "zh" : "en").catch(console.error);
+      sendPublisherGrantedEmail(appUser.email, appUser.name, userLang).catch(console.error);
     }
   } else {
     await prisma.$transaction([
@@ -87,16 +91,16 @@ export async function PATCH(
         data: {
           userId: application.userId,
           type: "APPLICATION_REJECTED",
-          title: appUser?.language === "zh" ? "发布权限申请未通过" : "Publisher access request rejected",
-          body: appUser?.language === "zh"
-            ? (rejectReason ? `申请未通过，原因：${rejectReason}` : "您的发布权限申请未通过审核。")
-            : (rejectReason ? `Request rejected. Reason: ${rejectReason}` : "Your publisher access request was rejected."),
+          title: st(userLang, "api.publisherRejectedTitle"),
+          body: rejectReason
+            ? st(userLang, "api.publisherRejectedWithReason", { reason: rejectReason })
+            : st(userLang, "api.publisherRejectedBody"),
         },
       }),
       markNotificationsRead,
     ]);
     if (appUser) {
-      sendPublisherRejectedEmail(appUser.email, appUser.name, rejectReason, appUser.language === "zh" ? "zh" : "en").catch(console.error);
+      sendPublisherRejectedEmail(appUser.email, appUser.name, rejectReason, userLang).catch(console.error);
     }
   }
 
