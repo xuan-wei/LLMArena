@@ -4,16 +4,47 @@ import { hashPassword, signJWT } from "@/lib/auth";
 import { sendWelcomeEmail } from "@/lib/email";
 import { st } from "@/lib/i18n/server";
 import { normalizeLanguage } from "@/lib/i18n";
+import { rateLimit, getClientIP } from "@/lib/rateLimit";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const WINDOW_MS = 3600000; // 1 hour
 
 export async function POST(request: Request) {
   let lang = "zh";
   try {
-    const { email, name, password, language } = await request.json();
+    const ip = getClientIP(request);
+    const maxReqs = Number(process.env.RATE_LIMIT_REGISTER) || 100;
+    const rl = rateLimit(`register:${ip}`, WINDOW_MS, maxReqs);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: st(lang, "auth.tooManyRequests") },
+        { status: 429 }
+      );
+    }
+
+    const { email: rawEmail, name: rawName, password, language } = await request.json();
     lang = normalizeLanguage(language);
 
-    if (!email || !name || !password) {
+    if (!rawEmail || !rawName || !password) {
       return NextResponse.json(
         { error: st(lang, "auth.registerRequired") },
+        { status: 400 }
+      );
+    }
+
+    const email = String(rawEmail).trim().toLowerCase();
+    const name = String(rawName).trim().replace(/\s+/g, " ");
+
+    if (!EMAIL_RE.test(email) || email.length > 254) {
+      return NextResponse.json(
+        { error: st(lang, "auth.invalidEmail") },
+        { status: 400 }
+      );
+    }
+
+    if (name.length > 50) {
+      return NextResponse.json(
+        { error: st(lang, "auth.nameTooLong") },
         { status: 400 }
       );
     }

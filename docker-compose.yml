@@ -28,4 +28,9 @@ services:
       LLM_CONCURRENCY: ${LLM_CONCURRENCY:-15}
       # How many submissions the worker thread processes concurrently.
       SUBMISSION_CONCURRENCY: ${SUBMISSION_CONCURRENCY:-10}
+      # Rate limiting — max requests per IP per window.
+      # Register: per hour. Login: per 15 minutes. Forgot-password: per hour.
+      RATE_LIMIT_REGISTER: ${RATE_LIMIT_REGISTER:-100}
+      RATE_LIMIT_LOGIN: ${RATE_LIMIT_LOGIN:-60}
+      RATE_LIMIT_FORGOT_PASSWORD: ${RATE_LIMIT_FORGOT_PASSWORD:-10}
     restart: unless-stopped

@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { ConnectivityTestDialog } from "@/components/ConnectivityTestDialog";
+import { translateSystemText } from "@/lib/i18n";
 
 interface LLMConfig {
   id: string;
@@ -22,9 +23,9 @@ interface LLMConfig {
 }
 
 export default function LLMConfigsPage() {
-  const { user, loading, authFetch } = useAuth();
+  const { user, loading, authFetch, locale } = useAuth();
   const router = useRouter();
-  const language = user?.language === "en" ? "en" : "zh";
+  const tr = (text: string) => translateSystemText(locale === "zh-CN" ? "zh" : "en", text);
   const [configs, setConfigs] = useState<LLMConfig[]>([]);
   const [form, setForm] = useState({ name: "", baseUrl: "", apiKey: "", models: "" });
   const [editId, setEditId] = useState<string | null>(null);
@@ -60,7 +61,7 @@ export default function LLMConfigsPage() {
 
   const save = async () => {
     if (!form.name || (!editId && !form.apiKey)) {
-      return toast.error("名称和 API Key 不能为空");
+      return toast.error(tr("名称和 API Key 不能为空"));
     }
     setSaving(true);
     try {
@@ -72,9 +73,9 @@ export default function LLMConfigsPage() {
       if (!res.ok) throw new Error((await res.json()).error);
       setOpen(false);
       load();
-      toast.success(editId ? "已更新" : "已添加");
+      toast.success(tr(editId ? "已更新" : "已添加"));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "操作失败");
+      toast.error(e instanceof Error ? e.message : tr("操作失败"));
     } finally {
       setSaving(false);
     }
@@ -90,49 +91,49 @@ export default function LLMConfigsPage() {
       ]);
       const data = await (res as Response).json();
       if (data.ok) {
-        setTestDialog({ open: true, status: "success", preview: `模型：${data.model}，回复: ${data.preview}` });
+        setTestDialog({ open: true, status: "success", preview: tr(`模型：${data.model}，回复: ${data.preview}`) });
         setTimeout(() => setTestDialog((v) => ({ ...v, open: false })), 2000);
       } else {
-        setTestDialog({ open: true, status: "fail", message: data.error || "连接失败" });
+        setTestDialog({ open: true, status: "fail", message: data.error || tr("连接失败") });
       }
     } catch {
-      setTestDialog({ open: true, status: "fail", message: "测试请求失败" });
+      setTestDialog({ open: true, status: "fail", message: tr("测试请求失败") });
     } finally {
       setTesting(null);
     }
   };
 
   const del = async (id: string) => {
-    if (!confirm("确定删除这个 LLM 配置吗？如果已有评分器正在使用它，将无法删除。")) return;
+    if (!confirm(tr("确定删除这个 LLM 配置吗？如果已有评分器正在使用它，将无法删除。"))) return;
     const res = await authFetch(`/api/admin/llm-configs/${id}`, { method: "DELETE" });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      return toast.error(data.error || "删除失败");
+      return toast.error(data.error || tr("删除失败"));
     }
     load();
-    toast.success("已删除");
+    toast.success(tr("已删除"));
   };
 
-  if (loading) return <div><Navbar backHref="/dashboard" backLabel="活动广场" /></div>;
+  if (loading) return <div><Navbar backHref="/dashboard" backLabel={tr("活动广场")} /></div>;
 
   return (
     <div>
-      <Navbar backHref="/dashboard" backLabel="活动广场" breadcrumbs={[{ label: "LLM 配置" }]} />
+      <Navbar backHref="/dashboard" backLabel={tr("活动广场")} breadcrumbs={[{ label: tr("LLM 配置") }]} />
       <main className="max-w-2xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold">LLM 配置</h1>
-            <p className="text-sm text-muted-foreground mt-1">管理可供评分器使用的 LLM 提供商</p>
+            <h1 className="text-2xl font-bold">{tr("LLM 配置")}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{tr("管理可供评分器使用的 LLM 提供商")}</p>
           </div>
-          <Button size="sm" onClick={openNew}>+ 添加</Button>
+          <Button size="sm" onClick={openNew}>{tr("+ 添加")}</Button>
         </div>
 
         <div className="space-y-3">
           {configs.length === 0 && (
             <Card className="border-dashed">
               <CardContent className="py-12 text-center text-muted-foreground">
-                <p className="mb-3">还没有 LLM 配置</p>
-                <Button variant="outline" size="sm" onClick={openNew}>添加第一个</Button>
+                <p className="mb-3">{tr("还没有 LLM 配置")}</p>
+                <Button variant="outline" size="sm" onClick={openNew}>{tr("添加第一个")}</Button>
               </CardContent>
             </Card>
           )}
@@ -147,7 +148,7 @@ export default function LLMConfigsPage() {
                       <CardDescription className="mt-0.5 space-y-0.5">
                         <div>{c.baseUrl} · Key: <code className="text-xs">{c.apiKey}</code></div>
                         {modelList.length > 0 && (
-                          <div className="text-xs">模型：{modelList.join("、")}</div>
+                          <div className="text-xs">{tr("模型")}: {modelList.join(", ")}</div>
                         )}
                       </CardDescription>
                     </div>
@@ -158,10 +159,10 @@ export default function LLMConfigsPage() {
                         onClick={() => testConfig(c)}
                         disabled={testing === c.id}
                       >
-                        {testing === c.id ? "测试中..." : "测试连接"}
+                        {testing === c.id ? tr("测试中...") : tr("测试连接")}
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => openEdit(c)}>编辑</Button>
-                      <Button variant="ghost" size="sm" className="text-destructive" onClick={() => del(c.id)}>删除</Button>
+                      <Button variant="outline" size="sm" onClick={() => openEdit(c)}>{tr("编辑")}</Button>
+                      <Button variant="ghost" size="sm" className="text-destructive" onClick={() => del(c.id)}>{tr("删除")}</Button>
                     </div>
                   </div>
                 </CardHeader>
@@ -173,13 +174,13 @@ export default function LLMConfigsPage() {
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{language === "en" ? `${editId ? "Edit" : "Add"} LLM Config` : `${editId ? "编辑" : "添加"} LLM 配置`}</DialogTitle>
+              <DialogTitle>{tr(editId ? "编辑" : "添加")} {tr("LLM 配置")}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-2">
               <div className="space-y-1.5">
-                <Label>显示名称 *</Label>
+                <Label>{tr("显示名称 *")}</Label>
                 <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="例：GPT-4o (OpenAI)" />
+                  placeholder={tr("例：GPT-4o (OpenAI)")} />
               </div>
               <div className="space-y-1.5">
                 <Label>API Base URL</Label>
@@ -187,22 +188,22 @@ export default function LLMConfigsPage() {
                   placeholder="https://api.openai.com/v1" />
               </div>
               <div className="space-y-1.5">
-                <Label>API Key {editId ? "（留空不修改）" : "*"}</Label>
+                <Label>API Key {editId ? tr("（留空不修改）") : "*"}</Label>
                 <Input type="password" value={form.apiKey} onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
                   placeholder="sk-..." />
               </div>
               <div className="space-y-1.5">
-                <Label>可用模型（逗号分隔）</Label>
+                <Label>{tr("可用模型（逗号分隔）")}</Label>
                 <Textarea
                   value={form.models}
                   onChange={(e) => setForm({ ...form, models: e.target.value })}
                   placeholder="gpt-4o, gpt-4o-mini, gpt-4-turbo"
                   rows={2}
                 />
-                <p className="text-xs text-muted-foreground">在评分器设置时可从下拉选择，留空则手动输入</p>
+                <p className="text-xs text-muted-foreground">{tr("在评分器设置时可从下拉选择，留空则手动输入")}</p>
               </div>
               <Button className="w-full" onClick={save} disabled={saving}>
-                {saving ? "保存中..." : "保存"}
+                {saving ? tr("保存中...") : tr("保存")}
               </Button>
             </div>
           </DialogContent>

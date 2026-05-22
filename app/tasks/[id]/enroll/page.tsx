@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { toast } from "sonner";
 import { ConnectivityTestDialog } from "@/components/ConnectivityTestDialog";
+import { translateSystemText } from "@/lib/i18n";
 
 type Mode = "OPENAI_COMPATIBLE" | "DIFY" | "COZE";
 
@@ -24,8 +25,9 @@ const MODE_LABELS: Record<Mode, string> = {
 
 export default function EnrollPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { user, loading, authFetch } = useAuth();
+  const { user, loading, authFetch, locale } = useAuth();
   const router = useRouter();
+  const tr = (text: string) => translateSystemText(locale === "zh-CN" ? "zh" : "en", text);
 
   const [task, setTask] = useState<{ title: string; status: string } | null>(null);
   const [isEnrolled, setIsEnrolled] = useState(false);
@@ -125,6 +127,14 @@ export default function EnrollPage({ params }: { params: Promise<{ id: string }>
   };
 
   const handleValidate = async () => {
+    if (mode === "DIFY" && (!difyApiKey || !difyEndpoint)) {
+      toast.error(tr("Dify 配置不完整，请填写 API Endpoint 和 API Key"));
+      return;
+    }
+    if (mode === "COZE" && (!cozeApiKey || !cozeEndpoint || !cozeBotId)) {
+      toast.error(tr("Coze 配置不完整，请填写 API Endpoint、API Key 和 Bot ID"));
+      return;
+    }
     setValidating(true);
     setTestDialog({ open: true, status: "testing" });
     try {

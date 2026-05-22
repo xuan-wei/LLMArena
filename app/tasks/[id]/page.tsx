@@ -202,7 +202,7 @@ export default function TaskPage({ params }: { params: Promise<{ id: string }> }
         </div>
 
         <Tabs defaultValue="enroll">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-4 overflow-x-auto">
             <TabsList>
               <TabsTrigger value="enroll">{tr("报名")} {isEnrolled ? "✓" : ""}</TabsTrigger>
               <TabsTrigger value="chatbot" disabled={!isEnrolled}>{tr("Chatbot 配置")}</TabsTrigger>
@@ -459,6 +459,18 @@ function ChatbotTab({
   };
 
   const handleValidate = async () => {
+    if (mode === "DIFY" && (!difyApiKey || !difyEndpoint)) {
+      toast.error(tr("Dify 配置不完整，请填写 API Endpoint 和 API Key"));
+      return;
+    }
+    if (mode === "COZE" && (!cozeApiKey || !cozeEndpoint || !cozeBotId)) {
+      toast.error(tr("Coze 配置不完整，请填写 API Endpoint、API Key 和 Bot ID"));
+      return;
+    }
+    if (mode === "OPENAI_COMPATIBLE" && !selectedConfigId) {
+      toast.error(tr("请先选择 LLM 账号"));
+      return;
+    }
     setValidating(true);
     setTestDialog({ open: true, status: "testing" });
     try {

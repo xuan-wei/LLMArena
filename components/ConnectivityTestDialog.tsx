@@ -16,15 +16,14 @@ type ConnectivityTestDialogProps = {
 export function ConnectivityTestDialog({
   open, status, message, preview, title, onClose,
 }: ConnectivityTestDialogProps) {
-  const { user, publicLanguage } = useAuth();
+  const { user, publicLanguage, t } = useAuth();
   const language = user?.language ?? publicLanguage;
-  const baseHeading = title ?? "连通性测试";
-  const heading = language === "en" ? translatePhraseToEnglish(baseHeading) : baseHeading;
-  const testingText = language === "en" ? `${heading} in progress...` : `${heading}中...`;
-  const successText = language === "en" ? `${heading} passed` : `${heading}通过`;
-  const failText = language === "en" ? `${heading} failed` : `${heading}失败`;
-  const helpText = language === "en" ? "Checking whether the chatbot can respond correctly" : "正在检测是否可以正常响应";
-  const closeText = language === "en" ? "Close" : "关闭";
+  const baseHeading = title ?? t("task.connectivityTest");
+  const heading = language === "en" && title ? translatePhraseToEnglish(title) : baseHeading;
+  const testingText = t("task.testInProgress", { heading });
+  const successText = t("task.testPassed", { heading });
+  const failText = t("task.testFailed", { heading });
+  const helpText = t("task.testHelpText");
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v && status === "fail") onClose(); }}>
@@ -48,7 +47,7 @@ export function ConnectivityTestDialog({
             <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-red-600 text-lg">✗</div>
             <p className="text-sm font-medium">{failText}</p>
             <p className="text-xs text-muted-foreground break-all">{message}</p>
-            <Button size="sm" variant="outline" onClick={onClose}>{closeText}</Button>
+            <Button size="sm" variant="outline" onClick={onClose}>{t("common.close")}</Button>
           </div>
         )}
       </DialogContent>

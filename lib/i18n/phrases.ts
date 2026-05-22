@@ -551,6 +551,21 @@ export const zhToEnPhrases: Record<string, string> = {
   "标题不能为空": "Title is required",
   "任务创建成功": "Task created",
   "创建失败": "Create failed",
+  "显示名称 *": "Display name *",
+  "例：GPT-4o (OpenAI)": "e.g. GPT-4o (OpenAI)",
+  "（留空不修改）": "(leave blank to keep current)",
+  "可用模型（逗号分隔）": "Available models (comma-separated)",
+  "在评分器设置时可从下拉选择，留空则手动输入": "Selectable in judge settings; leave blank for manual input",
+  "还没有 LLM 配置": "No LLM configs yet",
+  "确定删除这个 LLM 配置吗？如果已有评分器正在使用它，将无法删除。": "Delete this LLM config? Configs in use by judge profiles cannot be deleted.",
+  "测试请求失败": "Test request failed",
+  "删除失败": "Delete failed",
+  "题目内容不能为空": "Question content is required",
+  "确定删除该题库？题库内所有题目将一并删除。": "Delete this question bank? All questions will also be deleted.",
+  "Dify 配置不完整，请填写 API Endpoint 和 API Key": "Dify configuration is incomplete. Please fill in API Endpoint and API Key.",
+  "Coze 配置不完整，请填写 API Endpoint、API Key 和 Bot ID": "Coze configuration is incomplete. Please fill in API Endpoint, API Key, and Bot ID.",
+  "请先选择 LLM 账号": "Please select an LLM account first",
+  "已创建": "Created",
 };
 
 export function translatePhraseToEnglish(text: string) {
@@ -604,6 +619,10 @@ export function translatePhraseToEnglish(text: string) {
   const pageOnlyWithoutSuffix = trimmed.match(/^第\s*(\d+)\s*\/\s*(\d+)$/);
   if (pageOnlyWithoutSuffix) {
     return text.replace(trimmed, `Page ${pageOnlyWithoutSuffix[1]} / ${pageOnlyWithoutSuffix[2]}`);
+  }
+  const importedCount = trimmed.match(/^已导入\s*(\d+)\s*道题目$/);
+  if (importedCount) {
+    return text.replace(trimmed, `Imported ${importedCount[1]} questions`);
   }
   const questionCount = trimmed.match(/^(\d+)\s*道题目$/);
   if (questionCount) {
@@ -660,6 +679,10 @@ export function translatePhraseToEnglish(text: string) {
   const newApplicationBody = trimmed.match(/^用户\s+(.+?)\s+提交了发布权限申请，请前往管理控制台审批。$/);
   if (newApplicationBody) {
     return text.replace(trimmed, `User ${newApplicationBody[1]} submitted a publisher access request. Please review it in the admin console.`);
+  }
+  const modelReply = trimmed.match(/^模型：(.+?)，回复[:：]\s*(.+)$/);
+  if (modelReply) {
+    return text.replace(trimmed, `Model: ${modelReply[1]}, Reply: ${modelReply[2]}`);
   }
   const model = trimmed.match(/^模型：(.+)$/);
   if (model) {

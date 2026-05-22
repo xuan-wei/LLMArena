@@ -3,10 +3,20 @@ import { prisma } from "@/lib/prisma";
 import { verifyPassword, signJWT } from "@/lib/auth";
 import { st } from "@/lib/i18n/server";
 import { normalizeLanguage } from "@/lib/i18n";
+import { rateLimit, getClientIP } from "@/lib/rateLimit";
+
+const WINDOW_MS = 900000; // 15 minutes
 
 export async function POST(request: Request) {
   let lang = "zh";
   try {
+    const ip = getClientIP(request);
+    const maxReqs = Number(process.env.RATE_LIMIT_LOGIN) || 60;
+    const rl = rateLimit(`login:${ip}`, WINDOW_MS, maxReqs);
+    if (!rl.ok) {
+      return NextResponse.json({ error: st(lang, "auth.tooManyRequests") }, { status: 429 });
+    }
+
     const { email, password, language } = await request.json();
     lang = normalizeLanguage(language);
 

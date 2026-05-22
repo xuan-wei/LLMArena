@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { translateSystemText } from "@/lib/i18n";
 
 interface Bank {
   id: string;
@@ -33,8 +34,9 @@ interface BankDetail extends Omit<Bank, "_count"> {
 const PAGE_SIZE = 10;
 
 export default function AdminQuestionBanksPage() {
-  const { user, loading, authFetch } = useAuth();
+  const { user, loading, authFetch, locale } = useAuth();
   const router = useRouter();
+  const tr = (text: string) => translateSystemText(locale === "zh-CN" ? "zh" : "en", text);
   const [banks, setBanks] = useState<Bank[]>([]);
   const [page, setPage] = useState(1);
 
@@ -56,7 +58,7 @@ export default function AdminQuestionBanksPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const downloadBankTemplate = () => {
-    const csv = "\uFEFF" + [
+    const csv = "﻿" + [
       "question,answer",
       '"请描述大语言模型的主要特点","基于Transformer架构、通过大规模语料预训练的语言模型"',
       '"什么是 RAG？","检索增强生成，将外部检索与语言模型生成结合的技术"',
@@ -78,7 +80,7 @@ export default function AdminQuestionBanksPage() {
       "question,answer",
       ...bank.items.map((item) => [csvEscape(item.content), csvEscape(item.answer ?? "")].join(",")),
     ];
-    const csv = "\uFEFF" + rows.join("\r\n");
+    const csv = "﻿" + rows.join("\r\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -121,7 +123,7 @@ export default function AdminQuestionBanksPage() {
   };
 
   const saveBank = async () => {
-    if (!bankForm.name.trim()) return toast.error("名称不能为空");
+    if (!bankForm.name.trim()) return toast.error(tr("名称不能为空"));
     setSavingBank(true);
     try {
       const url = editBankId ? `/api/admin/question-banks/${editBankId}` : "/api/admin/question-banks";
@@ -132,24 +134,24 @@ export default function AdminQuestionBanksPage() {
       if (!res.ok) throw new Error((await res.json()).error);
       setBankOpen(false);
       load();
-      toast.success(editBankId ? "已更新" : "已创建");
+      toast.success(tr(editBankId ? "已更新" : "已创建"));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "失败");
+      toast.error(e instanceof Error ? e.message : tr("失败"));
     } finally {
       setSavingBank(false);
     }
   };
 
   const deleteBank = async (id: string) => {
-    if (!confirm("确定删除该题库？题库内所有题目将一并删除。")) return;
+    if (!confirm(tr("确定删除该题库？题库内所有题目将一并删除。"))) return;
     await authFetch(`/api/admin/question-banks/${id}`, { method: "DELETE" });
     load();
-    toast.success("已删除");
+    toast.success(tr("已删除"));
   };
 
   const addItem = async () => {
     if (!detail) return;
-    if (!newItem.content.trim()) return toast.error("题目内容不能为空");
+    if (!newItem.content.trim()) return toast.error(tr("题目内容不能为空"));
     setSavingItem(true);
     try {
       const res = await authFetch(`/api/admin/question-banks/${detail.id}/items`, {
@@ -161,9 +163,9 @@ export default function AdminQuestionBanksPage() {
       setNewItem({ content: "", answer: "" });
       await loadDetail(detail.id);
       load();
-      toast.success("已添加");
+      toast.success(tr("已添加"));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "失败");
+      toast.error(e instanceof Error ? e.message : tr("失败"));
     } finally {
       setSavingItem(false);
     }
@@ -174,7 +176,7 @@ export default function AdminQuestionBanksPage() {
     await authFetch(`/api/admin/question-banks/${detail.id}/items/${itemId}`, { method: "DELETE" });
     await loadDetail(detail.id);
     load();
-    toast.success("已删除");
+    toast.success(tr("已删除"));
   };
 
   const importBulk = async (csv: string) => {
@@ -191,9 +193,9 @@ export default function AdminQuestionBanksPage() {
       setImportCSV("");
       await loadDetail(detail.id);
       load();
-      toast.success(`已导入 ${data.count} 道题目`);
+      toast.success(tr(`已导入 ${data.count} 道题目`));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "失败");
+      toast.error(e instanceof Error ? e.message : tr("失败"));
     } finally {
       setImporting(false);
     }
@@ -218,20 +220,20 @@ export default function AdminQuestionBanksPage() {
 
   return (
     <div>
-      <Navbar breadcrumbs={[{ label: "样例题库管理" }]} />
+      <Navbar breadcrumbs={[{ label: tr("样例题库管理") }]} />
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold">样例题库管理</h1>
-            <p className="text-sm text-muted-foreground mt-1">创建公共题库，供所有发布者导入使用。</p>
+            <h1 className="text-2xl font-bold">{tr("样例题库管理")}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{tr("创建公共题库，供所有发布者导入使用。")}</p>
           </div>
-          <Button size="sm" onClick={openNew}>+ 创建题库</Button>
+          <Button size="sm" onClick={openNew}>{tr("+ 创建题库")}</Button>
         </div>
 
         {banks.length === 0 ? (
           <div className="rounded-xl border border-dashed py-16 text-center text-muted-foreground">
-            <p className="mb-3">还没有样例题库</p>
-            <Button variant="outline" size="sm" onClick={openNew}>创建第一个</Button>
+            <p className="mb-3">{tr("还没有样例题库")}</p>
+            <Button variant="outline" size="sm" onClick={openNew}>{tr("创建第一个")}</Button>
           </div>
         ) : (
           <>
@@ -239,9 +241,9 @@ export default function AdminQuestionBanksPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/30 hover:bg-muted/30">
-                    <TableHead className="font-medium">题库名称</TableHead>
-                    <TableHead className="font-medium">描述</TableHead>
-                    <TableHead className="w-20 text-center font-medium">题目数</TableHead>
+                    <TableHead className="font-medium">{tr("题库名称")}</TableHead>
+                    <TableHead className="font-medium">{tr("描述")}</TableHead>
+                    <TableHead className="w-20 text-center font-medium">{tr("题目数")}</TableHead>
                     <TableHead className="w-36" />
                   </TableRow>
                 </TableHeader>
@@ -250,17 +252,17 @@ export default function AdminQuestionBanksPage() {
                     <TableRow key={b.id}>
                       <TableCell className="font-medium">{b.name}</TableCell>
                       <TableCell className="text-sm text-muted-foreground max-w-[240px] truncate">
-                        {b.description || <span className="text-muted-foreground/40">无描述</span>}
+                        {b.description || <span className="text-muted-foreground/40">{tr("无描述")}</span>}
                       </TableCell>
                       <TableCell className="text-center text-sm text-muted-foreground">{b._count.items}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 justify-end">
                           <Button variant="outline" size="sm" className="h-7 px-2 text-xs"
-                            onClick={() => { loadDetail(b.id); }}>查看</Button>
+                            onClick={() => { loadDetail(b.id); }}>{tr("查看")}</Button>
                           <Button variant="ghost" size="sm" className="h-7 px-2 text-xs"
-                            onClick={() => openEdit(b)}>编辑</Button>
+                            onClick={() => openEdit(b)}>{tr("编辑")}</Button>
                           <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-destructive"
-                            onClick={() => deleteBank(b.id)}>删除</Button>
+                            onClick={() => deleteBank(b.id)}>{tr("删除")}</Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -270,9 +272,9 @@ export default function AdminQuestionBanksPage() {
             </div>
             {totalPages > 1 && (
               <div className="flex items-center justify-center gap-3 mt-4">
-                <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>上一页</Button>
-                <span className="text-sm text-muted-foreground">第 {page} / {totalPages} 页</span>
-                <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page >= totalPages}>下一页</Button>
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>{tr("上一页")}</Button>
+                <span className="text-sm text-muted-foreground">{tr(`第 ${page} / ${totalPages} 页`)}</span>
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page >= totalPages}>{tr("下一页")}</Button>
               </div>
             )}
           </>
@@ -282,21 +284,21 @@ export default function AdminQuestionBanksPage() {
         <Dialog open={bankOpen} onOpenChange={setBankOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{editBankId ? "编辑题库" : "创建样例题库"}</DialogTitle>
+              <DialogTitle>{tr(editBankId ? "编辑题库" : "创建样例题库")}</DialogTitle>
             </DialogHeader>
             <div className="space-y-3 pt-1">
               <div className="space-y-1.5">
-                <Label>题库名称 *</Label>
+                <Label>{tr("题库名称 *")}</Label>
                 <Input value={bankForm.name} onChange={(e) => setBankForm({ ...bankForm, name: e.target.value })}
-                  placeholder="例：写作能力测试题库" />
+                  placeholder={tr("例：写作能力测试题库")} />
               </div>
               <div className="space-y-1.5">
-                <Label>描述（可选）</Label>
+                <Label>{tr("描述（可选）")}</Label>
                 <Input value={bankForm.description} onChange={(e) => setBankForm({ ...bankForm, description: e.target.value })}
-                  placeholder="简要说明题库内容" />
+                  placeholder={tr("简要说明题库内容")} />
               </div>
               <Button className="w-full" onClick={saveBank} disabled={savingBank}>
-                {savingBank ? "保存中..." : "保存"}
+                {savingBank ? tr("保存中...") : tr("保存")}
               </Button>
             </div>
           </DialogContent>
@@ -311,28 +313,28 @@ export default function AdminQuestionBanksPage() {
             {detail && (
               <div className="space-y-4 pt-1">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">{detail.items.length} 道题目</p>
+                  <p className="text-sm text-muted-foreground">{tr(`${detail.items.length} 道题目`)}</p>
                   <div className="flex gap-2 flex-wrap">
                     <Button size="sm" variant="outline" onClick={downloadBankTemplate}>
-                      CSV 模板
+                      {tr("CSV 模板")}
                     </Button>
                     {detail.items.length > 0 && (
                       <Button size="sm" variant="outline" onClick={() => exportBankCSV(detail)}>
-                        导出 CSV
+                        {tr("导出 CSV")}
                       </Button>
                     )}
                     <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
-                      CSV 导入
+                      {tr("CSV 导入")}
                     </Button>
                     <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVFile} />
                     <Button size="sm" onClick={() => { setNewItem({ content: "", answer: "" }); setAddItemOpen(true); }}>
-                      + 添加题目
+                      {tr("+ 添加题目")}
                     </Button>
                   </div>
                 </div>
 
                 {detail.items.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">题库为空，请添加题目。</p>
+                  <p className="text-sm text-muted-foreground text-center py-8">{tr("题库为空，请添加题目。")}</p>
                 ) : (
                   <>
                     <div className="rounded-lg border overflow-hidden">
@@ -340,8 +342,8 @@ export default function AdminQuestionBanksPage() {
                         <TableHeader>
                           <TableRow className="bg-muted/30 hover:bg-muted/30">
                             <TableHead className="w-10">#</TableHead>
-                            <TableHead className="w-[55%]">题目</TableHead>
-                            <TableHead className="w-[35%]">参考答案</TableHead>
+                            <TableHead className="w-[55%]">{tr("题目")}</TableHead>
+                            <TableHead className="w-[35%]">{tr("参考答案")}</TableHead>
                             <TableHead className="w-16" />
                           </TableRow>
                         </TableHeader>
@@ -359,7 +361,7 @@ export default function AdminQuestionBanksPage() {
                               </TableCell>
                               <TableCell>
                                 <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-destructive"
-                                  onClick={() => deleteItem(item.id)}>删除</Button>
+                                  onClick={() => deleteItem(item.id)}>{tr("删除")}</Button>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -368,9 +370,9 @@ export default function AdminQuestionBanksPage() {
                     </div>
                     {detailTotalPages > 1 && (
                       <div className="flex items-center justify-center gap-3">
-                        <Button variant="outline" size="sm" onClick={() => setDetailPage((p) => p - 1)} disabled={detailPage <= 1}>上一页</Button>
-                        <span className="text-sm text-muted-foreground">第 {detailPage} / {detailTotalPages} 页</span>
-                        <Button variant="outline" size="sm" onClick={() => setDetailPage((p) => p + 1)} disabled={detailPage >= detailTotalPages}>下一页</Button>
+                        <Button variant="outline" size="sm" onClick={() => setDetailPage((p) => p - 1)} disabled={detailPage <= 1}>{tr("上一页")}</Button>
+                        <span className="text-sm text-muted-foreground">{tr(`第 ${detailPage} / ${detailTotalPages} 页`)}</span>
+                        <Button variant="outline" size="sm" onClick={() => setDetailPage((p) => p + 1)} disabled={detailPage >= detailTotalPages}>{tr("下一页")}</Button>
                       </div>
                     )}
                   </>
@@ -383,20 +385,20 @@ export default function AdminQuestionBanksPage() {
         {/* Add item dialog */}
         <Dialog open={addItemOpen} onOpenChange={setAddItemOpen}>
           <DialogContent>
-            <DialogHeader><DialogTitle>添加题目</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{tr("添加题目")}</DialogTitle></DialogHeader>
             <div className="space-y-3 pt-1">
               <div className="space-y-1.5">
-                <Label>题目内容 *</Label>
+                <Label>{tr("题目内容 *")}</Label>
                 <Textarea value={newItem.content} onChange={(e) => setNewItem({ ...newItem, content: e.target.value })}
-                  placeholder="输入题目内容" rows={3} />
+                  placeholder={tr("输入题目内容")} rows={3} />
               </div>
               <div className="space-y-1.5">
-                <Label>参考答案（可选）</Label>
+                <Label>{tr("参考答案（可选）")}</Label>
                 <Textarea value={newItem.answer} onChange={(e) => setNewItem({ ...newItem, answer: e.target.value })}
-                  placeholder="输入参考答案" rows={2} />
+                  placeholder={tr("输入参考答案")} rows={2} />
               </div>
               <Button className="w-full" onClick={addItem} disabled={savingItem}>
-                {savingItem ? "添加中..." : "添加"}
+                {savingItem ? tr("添加中...") : tr("添加")}
               </Button>
             </div>
           </DialogContent>

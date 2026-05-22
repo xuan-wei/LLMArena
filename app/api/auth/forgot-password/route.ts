@@ -4,10 +4,18 @@ import { sendPasswordResetEmail } from "@/lib/email";
 import crypto from "crypto";
 import { normalizeLanguage } from "@/lib/i18n";
 import { st } from "@/lib/i18n/server";
+import { rateLimit, getClientIP } from "@/lib/rateLimit";
 
 export async function POST(request: Request) {
   const { email, language } = await request.json();
   const lang = normalizeLanguage(language);
+
+  const ip = getClientIP(request);
+  const maxReqs = Number(process.env.RATE_LIMIT_FORGOT_PASSWORD) || 10;
+  const rl = rateLimit(`forgot:${ip}`, 3600000, maxReqs);
+  if (!rl.ok) {
+    return NextResponse.json({ error: st(lang, "auth.tooManyRequests") }, { status: 429 });
+  }
   if (!email) return NextResponse.json({ error: st(lang, "auth.emailRequired") }, { status: 400 });
 
   // Always return success to prevent email enumeration
