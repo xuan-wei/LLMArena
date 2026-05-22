@@ -6,11 +6,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { Language } from "@/lib/i18n";
 
 export function PublicLanguageToggle() {
-  const { user, publicLanguage, setPublicLanguage, t } = useAuth();
+  const { user, publicLanguage, setPublicLanguage, setLanguage, t } = useAuth();
   const language = user?.language ?? publicLanguage;
 
-  const setLanguage = (next: Language) => {
-    if (!user) setPublicLanguage(next);
+  const switchLanguage = (next: Language) => {
+    setPublicLanguage(next);
+    if (user && user.language !== next) {
+      setLanguage(next).catch(() => {});
+    }
   };
 
   return (
@@ -21,7 +24,7 @@ export function PublicLanguageToggle() {
         size="sm"
         variant={language === "zh" ? "default" : "ghost"}
         className="h-7 rounded-full px-3"
-        onClick={() => setLanguage("zh")}
+        onClick={() => switchLanguage("zh")}
       >
         中文
       </Button>
@@ -30,7 +33,7 @@ export function PublicLanguageToggle() {
         size="sm"
         variant={language === "en" ? "default" : "ghost"}
         className="h-7 rounded-full px-3"
-        onClick={() => setLanguage("en")}
+        onClick={() => switchLanguage("en")}
       >
         English
       </Button>
