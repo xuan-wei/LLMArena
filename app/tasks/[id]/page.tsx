@@ -18,6 +18,7 @@ import Link from "next/link";
 import { getScoreColors } from "@/lib/scoreColors";
 import { SysErrTooltip, classifyError, stripTechnicalDetails } from "@/components/SysErrTooltip";
 import { ConnectivityTestDialog } from "@/components/ConnectivityTestDialog";
+import { translateSystemText } from "@/lib/i18n";
 
 // ────────── Types ──────────
 interface Task {
@@ -82,6 +83,10 @@ const MODE_LABELS: Record<string, string> = {
   ADMIN_LLM: "管理员指定", OPENAI_COMPATIBLE: "LLM（OpenAI API）", DIFY: "Dify Chatbot", COZE: "Coze Chatbot",
 };
 
+function useSystemText() {
+  const { locale } = useAuth();
+  return (text: string) => translateSystemText(locale === "zh-CN" ? "zh" : "en", text);
+}
 
 function looksLikeTwentyFourPointQuestion(content: string) {
   const nums = content.match(/-?\d+(?:\.\d+)?/g) ?? [];
@@ -97,6 +102,7 @@ function shouldUseTwentyFourPointPrompt(questions: Question[]) {
 export default function TaskPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user, loading, authFetch, locale } = useAuth();
+  const tr = useSystemText();
   const router = useRouter();
 
   const [task, setTask] = useState<Task | null>(null);
@@ -171,7 +177,7 @@ export default function TaskPage({ params }: { params: Promise<{ id: string }> }
   }, [user, id]); // eslint-disable-line
 
   if (loading || fetching || !task || !user) {
-    return <div><Navbar backHref="/dashboard" backLabel="任务列表" /></div>;
+    return <div><Navbar backHref="/dashboard" backLabel={tr("任务列表")} /></div>;
   }
 
   const isEnrolled = !!enrollment;
@@ -183,7 +189,7 @@ export default function TaskPage({ params }: { params: Promise<{ id: string }> }
 
   return (
     <div>
-      <Navbar backHref="/dashboard" backLabel="任务列表" breadcrumbs={[{ label: task.title }]} />
+      <Navbar backHref="/dashboard" backLabel={tr("任务列表")} breadcrumbs={[{ label: task.title }]} />
       <main className="max-w-5xl mx-auto px-4 py-6">
         <div className="flex items-start justify-between mb-4">
           <div>
@@ -191,23 +197,23 @@ export default function TaskPage({ params }: { params: Promise<{ id: string }> }
             {task.description && <p className="text-muted-foreground mt-1 text-sm">{task.description}</p>}
           </div>
           <Badge variant={task.status === "ENDED" ? "secondary" : "default"}>
-            {STATUS_LABEL[task.status] ?? task.status}
+            {tr(STATUS_LABEL[task.status] ?? task.status)}
           </Badge>
         </div>
 
         <Tabs defaultValue="enroll">
           <div className="flex items-center gap-2 mb-4">
             <TabsList>
-              <TabsTrigger value="enroll">报名 {isEnrolled ? "✓" : ""}</TabsTrigger>
-              <TabsTrigger value="chatbot" disabled={!isEnrolled}>Chatbot 配置</TabsTrigger>
-              <TabsTrigger value="submit" disabled={!isEnrolled}>答题/提交</TabsTrigger>
-              <TabsTrigger value="leaderboard" onClick={loadLeaderboard}>排行榜</TabsTrigger>
-              <TabsTrigger value="award" onClick={loadAwardLeaderboard}>颁奖</TabsTrigger>
+              <TabsTrigger value="enroll">{tr("报名")} {isEnrolled ? "✓" : ""}</TabsTrigger>
+              <TabsTrigger value="chatbot" disabled={!isEnrolled}>{tr("Chatbot 配置")}</TabsTrigger>
+              <TabsTrigger value="submit" disabled={!isEnrolled}>{tr("答题/提交")}</TabsTrigger>
+              <TabsTrigger value="leaderboard" onClick={loadLeaderboard}>{tr("排行榜")}</TabsTrigger>
+              <TabsTrigger value="award" onClick={loadAwardLeaderboard}>{tr("颁奖")}</TabsTrigger>
             </TabsList>
             <Button
               variant="outline" size="sm"
               onClick={() => { loadTask(); loadEnrollment(); loadSubmissions(); loadLeaderboard(); }}
-            >↻ 刷新</Button>
+            >{tr("↻ 刷新")}</Button>
           </div>
 
           {/* ── 报名 Tab ── */}
@@ -289,6 +295,7 @@ function EnrollTab({
   authFetch: (url: string, opts?: RequestInit) => Promise<Response>;
 }) {
   const [saving, setSaving] = useState(false);
+  const tr = useSystemText();
 
   const handleEnroll = async () => {
     setSaving(true);
@@ -297,8 +304,8 @@ function EnrollTab({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       onEnrolled(data.enrollment);
-      toast.success("报名成功！请前往「Chatbot 配置」设置接入方式。");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "报名失败"); }
+      toast.success(tr("报名成功！请前往「Chatbot 配置」设置接入方式。"));
+    } catch (e) { toast.error(e instanceof Error ? e.message : tr("报名失败")); }
     finally { setSaving(false); }
   };
 
@@ -308,8 +315,8 @@ function EnrollTab({
       const res = await authFetch(`/api/tasks/${taskId}/enrollment`, { method: "DELETE" });
       if (!res.ok) throw new Error((await res.json()).error);
       onWithdrawn();
-      toast.success("已取消报名");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "操作失败"); }
+      toast.success(tr("已取消报名"));
+    } catch (e) { toast.error(e instanceof Error ? e.message : tr("操作失败")); }
     finally { setSaving(false); }
   };
 
@@ -320,33 +327,33 @@ function EnrollTab({
     <Card className="max-w-sm">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>报名状态</CardTitle>
+          <CardTitle>{tr("报名状态")}</CardTitle>
           <Badge variant={isEnrolled ? "default" : "outline"}>
-            {isEnrolled ? "已报名" : "未报名"}
+            {isEnrolled ? tr("已报名") : tr("未报名")}
           </Badge>
         </div>
         <CardDescription>
-          {taskStatus === "PRELIMINARY" ? "海选阶段开放中" :
-            taskStatus === "FINALS" ? "终赛进行中" :
-              "当前不在报名阶段"}
+          {taskStatus === "PRELIMINARY" ? tr("海选阶段开放中") :
+            taskStatus === "FINALS" ? tr("终赛进行中") :
+              tr("当前不在报名阶段")}
         </CardDescription>
       </CardHeader>
       <CardContent>
         {!isEnrolled && canEnroll && (
           <Button onClick={handleEnroll} disabled={saving}>
-            {saving ? "报名中..." : "确认报名"}
+            {saving ? tr("报名中...") : tr("确认报名")}
           </Button>
         )}
         {isEnrolled && canWithdraw && (
           <Button variant="outline" onClick={handleWithdraw} disabled={saving}>
-            {saving ? "操作中..." : "取消报名"}
+            {saving ? tr("操作中...") : tr("取消报名")}
           </Button>
         )}
         {isEnrolled && !canWithdraw && (
-          <p className="text-sm text-muted-foreground">已报名参赛</p>
+          <p className="text-sm text-muted-foreground">{tr("已报名参赛")}</p>
         )}
         {!isEnrolled && !canEnroll && (
-          <p className="text-sm text-muted-foreground">当前不在报名阶段</p>
+          <p className="text-sm text-muted-foreground">{tr("当前不在报名阶段")}</p>
         )}
       </CardContent>
     </Card>
@@ -355,31 +362,32 @@ function EnrollTab({
 
 // ────────── Admin LLM Chatbot Card (管理员指定模式) ──────────
 function AdminLLMChatbotCard({ task }: { task: Task }) {
+  const tr = useSystemText();
   return (
     <Card className="max-w-lg">
       <CardHeader>
-        <CardTitle className="text-base">接入方式：管理员指定</CardTitle>
+        <CardTitle className="text-base">{tr("接入方式：管理员指定")}</CardTitle>
         <CardDescription>
-          本活动统一使用以下 LLM，请前往「答题」页面填写你的 Prompt 并提交。
+          {tr("本活动统一使用以下 LLM，请前往「答题」页面填写你的 Prompt 并提交。")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-1.5 text-sm">
         {task.adminLLMConfig && (
           <div className="flex gap-2">
-            <span className="text-muted-foreground w-24 shrink-0">LLM 提供商</span>
+            <span className="text-muted-foreground w-24 shrink-0">{tr("LLM 提供商")}</span>
             <span>{task.adminLLMConfig.name}</span>
           </div>
         )}
         {task.adminModel && (
           <div className="flex gap-2">
-            <span className="text-muted-foreground w-24 shrink-0">模型</span>
+            <span className="text-muted-foreground w-24 shrink-0">{tr("模型")}</span>
             <span className="font-mono">{task.adminModel}</span>
           </div>
         )}
         {task.adminEnableThinking && (
           <div className="flex gap-2">
-            <span className="text-muted-foreground w-24 shrink-0">深度思考</span>
-            <span>已开启{task.adminThinkingBudget ? `（budget: ${task.adminThinkingBudget}）` : ""}</span>
+            <span className="text-muted-foreground w-24 shrink-0">{tr("深度思考")}</span>
+            <span>{tr("已开启")}{task.adminThinkingBudget ? ` (budget: ${task.adminThinkingBudget})` : ""}</span>
           </div>
         )}
         {task.adminTemperature != null && (
@@ -401,6 +409,8 @@ function ChatbotTab({
   onSaved: (e: Enrollment) => void;
   authFetch: (url: string, opts?: RequestInit) => Promise<Response>;
 }) {
+  const tr = useSystemText();
+
   if (task.adminLLMEnabled) {
     return <AdminLLMChatbotCard task={task} />;
   }
@@ -443,8 +453,8 @@ function ChatbotTab({
     setSaving(true);
     try {
       await doSave();
-      toast.success("配置已保存");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "保存失败"); }
+      toast.success(tr("配置已保存"));
+    } catch (e) { toast.error(e instanceof Error ? e.message : tr("保存失败")); }
     finally { setSaving(false); }
   };
 
@@ -462,28 +472,28 @@ function ChatbotTab({
         setTestDialog({ open: true, status: "success", preview: data.preview });
         setTimeout(() => setTestDialog((v) => ({ ...v, open: false })), 2000);
       } else {
-        setTestDialog({ open: true, status: "fail", message: data.message || "连接失败" });
+        setTestDialog({ open: true, status: "fail", message: data.message || tr("连接失败") });
       }
     } catch (e) {
-      setTestDialog({ open: true, status: "fail", message: e instanceof Error ? e.message : "保存或测试失败" });
+      setTestDialog({ open: true, status: "fail", message: e instanceof Error ? e.message : tr("保存或测试失败") });
     } finally { setValidating(false); }
   };
 
   return (
     <Card className="max-w-lg">
       <CardHeader>
-        <CardTitle>Chatbot 接入配置</CardTitle>
-        <CardDescription>选择接入方式，配置好后可点击「连通性测试」验证</CardDescription>
+        <CardTitle>{tr("Chatbot 接入配置")}</CardTitle>
+        <CardDescription>{tr("选择接入方式，配置好后可点击「连通性测试」验证")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-1.5">
-          <Label>接入方式</Label>
+          <Label>{tr("接入方式")}</Label>
           <Select value={mode} onValueChange={(v) => v && setMode(v)}>
             <SelectTrigger>
-              <span className="flex-1 text-left text-sm">{MODE_LABELS[mode] ?? mode}</span>
+              <span className="flex-1 text-left text-sm">{tr(MODE_LABELS[mode] ?? mode)}</span>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="OPENAI_COMPATIBLE">LLM（OpenAI 兼容 API）</SelectItem>
+              <SelectItem value="OPENAI_COMPATIBLE">{tr("LLM（OpenAI 兼容 API）")}</SelectItem>
               <SelectItem value="DIFY">Dify Chatbot</SelectItem>
               <SelectItem value="COZE">Coze Chatbot</SelectItem>
             </SelectContent>
@@ -493,21 +503,20 @@ function ChatbotTab({
         {mode === "OPENAI_COMPATIBLE" && (
           <>
             <div className="rounded border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
-              OpenAI 兼容接口通常填写到 <code className="rounded bg-white/70 px-1">/v1</code> 层级，例如{" "}
-              <code className="rounded bg-white/70 px-1">https://api.example.com/v1</code>；模型名需要和服务商控制台中的名称一致。
+              {tr("OpenAI 兼容接口通常填写到 /v1 层级，例如 https://api.example.com/v1；模型名需要和服务商控制台中的名称一致。")}
             </div>
             {llmConfigs.length === 0 ? (
               <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                ⚠️ 还没有添加 LLM 账号。
-                <Link href="/account/llm-config" className="underline font-medium ml-1">去添加</Link>
+                {tr("还没有添加 LLM 账号。")}
+                <Link href="/account/llm-config" className="underline font-medium ml-1">{tr("去添加")}</Link>
               </div>
             ) : (
               <div className="space-y-1.5">
-                <Label>选择 LLM 账号</Label>
+                <Label>{tr("选择 LLM 账号")}</Label>
                 <Select value={selectedConfigId} onValueChange={(v) => { setSelectedConfigId(v ?? ""); setModel(""); }}>
                   <SelectTrigger>
                     <span className={`flex-1 text-left text-sm ${!selectedConfigId ? "text-muted-foreground" : ""}`}>
-                      {llmConfigs.find((c) => c.id === selectedConfigId)?.name || "选择账号"}
+                      {llmConfigs.find((c) => c.id === selectedConfigId)?.name || tr("选择账号")}
                     </span>
                   </SelectTrigger>
                   <SelectContent>
@@ -519,12 +528,12 @@ function ChatbotTab({
               </div>
             )}
             <div className="space-y-1.5">
-              <Label>选择模型</Label>
+              <Label>{tr("选择模型")}</Label>
               {availableModels.length > 0 ? (
                 <Select value={model} onValueChange={(v) => v && setModel(v)}>
                   <SelectTrigger>
                     <span className={`flex-1 text-left text-sm ${!model ? "text-muted-foreground" : ""}`}>
-                      {model || "选择模型"}
+                      {model || tr("选择模型")}
                     </span>
                   </SelectTrigger>
                   <SelectContent>
@@ -543,13 +552,13 @@ function ChatbotTab({
                   onChange={(e) => setEnableThinking(e.target.checked)}
                   className="h-4 w-4 rounded border"
                 />
-                <span className="text-sm">开启深度思考（Thinking）</span>
+                <span className="text-sm">{tr("开启深度思考（Thinking）")}</span>
               </label>
-              <p className="text-xs text-muted-foreground pl-6">仅 Qwen3 等支持 CoT 的模型有效；不支持的模型开启无效</p>
+              <p className="text-xs text-muted-foreground pl-6">{tr("仅 Qwen3 等支持 CoT 的模型有效；不支持的模型开启无效")}</p>
             </div>
             {enableThinking && (
               <div className="space-y-1.5">
-                <Label>Thinking Budget（留空默认 1024）</Label>
+                <Label>{tr("Thinking Budget（留空默认 1024）")}</Label>
                 <Input
                   value={thinkingBudget}
                   onChange={(e) => setThinkingBudget(e.target.value)}
@@ -559,11 +568,11 @@ function ChatbotTab({
                   step="256"
                   className="w-48"
                 />
-                <p className="text-xs text-muted-foreground">限制 CoT 最多使用的 token 数。留空 = 1024。不支持 Thinking 的模型此项无效</p>
+                <p className="text-xs text-muted-foreground">{tr("限制 CoT 最多使用的 token 数。留空 = 1024。不支持 Thinking 的模型此项无效")}</p>
               </div>
             )}
             <div className="space-y-1.5">
-              <Label>Temperature（留空使用模型默认值）</Label>
+              <Label>{tr("Temperature（留空使用模型默认值）")}</Label>
               <Input
                 value={temperature}
                 onChange={(e) => setTemperature(e.target.value)}
@@ -576,7 +585,7 @@ function ChatbotTab({
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Max Tokens（留空默认 2048）</Label>
+              <Label>{tr("Max Tokens（留空默认 2048）")}</Label>
               <Input
                 value={maxTokens}
                 onChange={(e) => setMaxTokens(e.target.value)}
@@ -593,13 +602,13 @@ function ChatbotTab({
         {mode === "DIFY" && (
           <>
             <div className="rounded border border-blue-100 bg-blue-50 p-3 text-sm text-blue-800">
-              题目内容将直接发送给 Dify Chatbot，请在 Dify 平台配置好 Chatbot 逻辑；如果是 24 点题目，请明确要求“每个数字恰好使用一次，构造等于 24 的表达式”。{" "}
-              <a href="https://docs.dify.ai/zh/use-dify/publish/developing-with-apis" target="_blank" rel="noopener noreferrer" className="underline font-medium">参考文档 →</a>
+              {tr("题目内容将直接发送给 Dify Chatbot，请在 Dify 平台配置好 Chatbot 逻辑；如果是 24 点题目，请明确要求每个数字恰好使用一次，构造等于 24 的表达式。")}{" "}
+              <a href="https://docs.dify.ai/zh/use-dify/publish/developing-with-apis" target="_blank" rel="noopener noreferrer" className="underline font-medium">{tr("参考文档 →")}</a>
             </div>
             <div className="space-y-1.5">
               <Label>Dify API Endpoint</Label>
               <Input value={difyEndpoint} onChange={(e) => setDifyEndpoint(e.target.value)} placeholder="https://api.dify.ai/v1" />
-              <p className="text-xs text-muted-foreground">填写应用 API Endpoint，例如 https://api.dify.ai/v1；系统会自动调用 /chat-messages，通常不要粘贴带查询参数的完整请求 URL。</p>
+              <p className="text-xs text-muted-foreground">{tr("填写应用 API Endpoint，例如 https://api.dify.ai/v1；系统会自动调用 /chat-messages，通常不要粘贴带查询参数的完整请求 URL。")}</p>
             </div>
             <div className="space-y-1.5">
               <Label>API Key</Label>
@@ -611,13 +620,13 @@ function ChatbotTab({
         {mode === "COZE" && (
           <>
             <div className="rounded border border-blue-100 bg-blue-50 p-3 text-sm text-blue-800">
-              题目内容将直接发送给 Coze Bot，请在 Coze 平台配置好 Bot 逻辑；如果是 24 点题目，请明确要求“每个数字恰好使用一次，构造等于 24 的表达式”。{" "}
-              <a href="https://www.coze.cn/open/docs/guides/publish_agent_api" target="_blank" rel="noopener noreferrer" className="underline font-medium">参考文档 →</a>
+              {tr("题目内容将直接发送给 Coze Bot，请在 Coze 平台配置好 Bot 逻辑；如果是 24 点题目，请明确要求每个数字恰好使用一次，构造等于 24 的表达式。")}{" "}
+              <a href="https://www.coze.cn/open/docs/guides/publish_agent_api" target="_blank" rel="noopener noreferrer" className="underline font-medium">{tr("参考文档 →")}</a>
             </div>
             <div className="space-y-1.5">
               <Label>Coze API Endpoint</Label>
               <Input value={cozeEndpoint} onChange={(e) => setCozeEndpoint(e.target.value)} placeholder="https://api.coze.cn" />
-              <p className="text-xs text-muted-foreground">填写 Coze API 域名，例如 https://api.coze.cn；Bot ID、API Key 从 Coze 发布后的 API 配置中获取。</p>
+              <p className="text-xs text-muted-foreground">{tr("填写 Coze API 域名，例如 https://api.coze.cn；Bot ID、API Key 从 Coze 发布后的 API 配置中获取。")}</p>
             </div>
             <div className="space-y-1.5">
               <Label>API Key</Label>
@@ -631,8 +640,8 @@ function ChatbotTab({
         )}
 
         <div className="flex gap-2 pt-1">
-          <Button onClick={handleSave} disabled={saving}>{saving ? "保存中..." : "保存配置"}</Button>
-          <Button variant="outline" onClick={handleValidate} disabled={validating}>{validating ? "测试中..." : "连通性测试"}</Button>
+          <Button onClick={handleSave} disabled={saving}>{saving ? tr("保存中...") : tr("保存配置")}</Button>
+          <Button variant="outline" onClick={handleValidate} disabled={validating}>{validating ? tr("测试中...") : tr("连通性测试")}</Button>
         </div>
       </CardContent>
       <ConnectivityTestDialog
@@ -660,7 +669,9 @@ function SubmitTab({
   llmConfigs: LLMConfig[];
   authFetch: (url: string, opts?: RequestInit) => Promise<Response>;
 }) {
-  const { t, locale } = useAuth();  const isTwentyFourPointTask = shouldUseTwentyFourPointPrompt(publicQuestions);
+  const { t, locale } = useAuth();
+  const tr = useSystemText();
+  const isTwentyFourPointTask = shouldUseTwentyFourPointPrompt(publicQuestions);
   const twentyFourPrompt = t("template.twentyFourPrompt");
   const recommendedPrompt = isTwentyFourPointTask ? twentyFourPrompt : "Please answer the following question:\n\n{{question}}";
   const [prompt, setPrompt] = useState(enrollment.prompt || (enrollment.mode === "OPENAI_COMPATIBLE" && isTwentyFourPointTask ? twentyFourPrompt : ""));
@@ -691,9 +702,9 @@ function SubmitTab({
   useEffect(() => () => { eventSourceRef.current?.close(); }, []);
 
   const cfgName = task.adminLLMEnabled
-    ? `管理员指定 · ${task.adminModel || "未配置模型"}`
+    ? `${tr("管理员指定")} · ${task.adminModel || tr("未配置模型")}`
     : enrollment.mode === "OPENAI_COMPATIBLE"
-      ? `${enrollment.studentLLMConfig?.name ?? "未选账号"} · ${enrollment.model || "未选模型"}`
+      ? `${enrollment.studentLLMConfig?.name ?? tr("未选账号")} · ${enrollment.model || tr("未选模型")}`
       : enrollment.mode === "DIFY" ? "Dify Chatbot"
         : enrollment.mode === "COZE" ? "Coze Chatbot" : enrollment.mode;
 
@@ -719,8 +730,8 @@ function SubmitTab({
       });
       if (!res.ok) throw new Error((await res.json()).error);
       onSaved({ ...enrollment, prompt });
-      toast.success("Prompt 已保存");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "保存失败"); }
+      toast.success(tr("Prompt 已保存"));
+    } catch (e) { toast.error(e instanceof Error ? e.message : tr("保存失败")); }
     finally { setSavingPrompt(false); }
   };
 
@@ -963,7 +974,7 @@ function SubmitTab({
             <CardContent className="pb-3 space-y-2">
               {isTwentyFourPointTask && enrollment.mode === "OPENAI_COMPATIBLE" && (
                 <div className="rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-                  {t(“task.recommended24Prompt”)}
+                  <p>{t("task.recommended24Prompt")}</p>
                   <Button
                     type="button"
                     size="sm"
@@ -986,7 +997,7 @@ function SubmitTab({
                 {t("task.promptHelp")}
               </p>
               <Button size="sm" variant="outline" onClick={savePrompt} disabled={savingPrompt}>
-                {savingPrompt ? "保存中..." : "保存 Prompt"}
+                {savingPrompt ? tr("保存中...") : tr("保存 Prompt")}
               </Button>
             </CardContent>
           </Card>
@@ -996,15 +1007,15 @@ function SubmitTab({
         <Card>
           <CardHeader className="py-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm">公开题目（{publicQuestions.length}）</CardTitle>
+              <CardTitle className="text-sm">{tr("公开题目")} ({publicQuestions.length})</CardTitle>
               <span className="text-xs text-muted-foreground">
-                剩余试跑次数：{Math.max(0, task.maxTrialRuns - trialRunsUsed)}
+                {tr("剩余试跑次数")}: {Math.max(0, task.maxTrialRuns - trialRunsUsed)}
               </span>
             </div>
           </CardHeader>
           <CardContent className="pb-3">
             {publicQuestions.length === 0 ? (
-              <p className="text-xs text-muted-foreground text-center py-4">暂无公开题目</p>
+              <p className="text-xs text-muted-foreground text-center py-4">{tr("暂无公开题目")}</p>
             ) : (
               <div className="space-y-2">
                 {publicQuestions.map((q, i) => (
@@ -1013,16 +1024,16 @@ function SubmitTab({
                       <div className="min-w-0">
                         <p className="text-xs text-muted-foreground mb-1">Q{i + 1}</p>
                         <p className="text-sm">{q.content}</p>
-                        <p className="text-xs text-muted-foreground mt-1">参考答案：{q.answer ?? "—"}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{tr("参考答案")}: {q.answer ?? "—"}</p>
                       </div>
                       <Button
                         size="sm" variant="outline"
                         className="h-6 px-2 text-xs shrink-0 mt-0.5"
                         onClick={() => openTrialForQuestion(q.id)}
                         disabled={isLockedForFinals || phaseSubs.length >= maxSubs}
-                        title={isLockedForFinals ? "未晋级终赛，无法试跑" : phaseSubs.length >= maxSubs ? "已达提交上限，无法试跑" : undefined}
+                        title={isLockedForFinals ? tr("未晋级终赛，无法试跑") : phaseSubs.length >= maxSubs ? tr("已达提交上限，无法试跑") : undefined}
                       >
-                        试跑
+                        {tr("试跑")}
                       </Button>
                     </div>
                   </div>
@@ -1038,7 +1049,7 @@ function SubmitTab({
         <DialogContent className="w-[90vw] max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-base">
-              试跑 — Q{publicQuestions.findIndex((q) => q.id === trialQuestion) + 1}
+              {tr("试跑")} — Q{publicQuestions.findIndex((q) => q.id === trialQuestion) + 1}
             </DialogTitle>
           </DialogHeader>
           {trialQuestion && (
@@ -1050,7 +1061,7 @@ function SubmitTab({
               {(trialState !== "idle" && (trialLLMInput || trialEffectivePrompt)) && (
                 <details className="text-xs">
                   <summary className="cursor-pointer text-muted-foreground hover:text-foreground select-none">
-                    LLM 输入（实际发送）▸
+                    {tr("LLM 输入（实际发送）")} ▸
                   </summary>
                   <pre className="mt-1 bg-muted rounded p-2 whitespace-pre-wrap font-mono overflow-x-auto max-h-48 overflow-y-auto text-xs">
                     {trialLLMInput
@@ -1070,7 +1081,7 @@ function SubmitTab({
               )}
 
               {trialState === "idle" && (
-                <Button size="sm" onClick={() => startTrial()}>开始试跑</Button>
+                <Button size="sm" onClick={() => startTrial()}>{tr("开始试跑")}</Button>
               )}
 
               {trialState === "error" && (
@@ -1078,7 +1089,7 @@ function SubmitTab({
                   <div className="rounded border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
                     {trialError}
                   </div>
-                  <Button size="sm" variant="outline" onClick={() => startTrial()}>重试</Button>
+                  <Button size="sm" variant="outline" onClick={() => startTrial()}>{tr("重试")}</Button>
                 </div>
               )}
 
@@ -1087,7 +1098,7 @@ function SubmitTab({
                   {trialThinking && (
                     <details className="text-xs">
                       <summary className="cursor-pointer text-amber-700 hover:text-amber-900 select-none">
-                        🧠 思考过程 ▸
+                        🧠 {tr("思考过程")} ▸
                       </summary>
                       <pre className="mt-1 bg-amber-50 border border-amber-200 rounded p-2 whitespace-pre-wrap font-mono overflow-x-auto max-h-48 overflow-y-auto text-amber-900">{trialThinking}</pre>
                     </details>
@@ -1097,7 +1108,7 @@ function SubmitTab({
                       {trialState === "running" && (
                         <span className="inline-block h-3 w-3 rounded-full border-2 border-primary border-t-transparent animate-spin" />
                       )}
-                      {trialState === "running" ? "生成中..." : "输出"}
+                      {trialState === "running" ? tr("生成中...") : tr("输出")}
                     </p>
                     <div className="bg-muted rounded p-2 text-xs font-mono whitespace-pre-wrap min-h-[4rem] max-h-64 overflow-y-auto">
                       {trialOutput || <span className="opacity-40">▌</span>}
@@ -1106,11 +1117,11 @@ function SubmitTab({
                   {trialState === "done" && trialOutput && (
                     <div className="flex items-center gap-3 pt-1">
                       <Button size="sm" variant="outline" className="h-7 text-xs" onClick={evaluateTrial} disabled={evaluating}>
-                        {evaluating ? "评估中..." : "评估此答案"}
+                        {evaluating ? tr("评估中...") : tr("评估此答案")}
                       </Button>
                       {trialEval && (
                         <span className={`text-xs ${trialEval.score === null ? "text-amber-600" : "text-muted-foreground"}`}>
-                          得分: <span className="font-medium">{trialEval.score !== null ? `${(trialEval.score * 100).toFixed(1)}%` : "N/A"}</span>
+                          {tr("得分")}: <span className="font-medium">{trialEval.score !== null ? `${(trialEval.score * 100).toFixed(1)}%` : "N/A"}</span>
                           {trialEval.reason && <span className="ml-1">— {trialEval.reason}</span>}
                         </span>
                       )}
@@ -1131,14 +1142,14 @@ function SubmitTab({
             <CardContent className="py-3">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm text-muted-foreground">
-                  已提交 {phaseSubs.length}/{maxSubs} 次
-                  {phaseSubs.length >= maxSubs && <span className="text-destructive ml-1">（已达上限）</span>}
+                  {tr("已提交")} {phaseSubs.length}/{maxSubs} {tr("次")}
+                  {phaseSubs.length >= maxSubs && <span className="text-destructive ml-1">{tr("（已达上限）")}</span>}
                 </p>
                 <Button
                   onClick={handleSubmit}
                   disabled={submitting || phaseSubs.length >= maxSubs}
                 >
-                  {submitting ? "提交中..." : "提交评测"}
+                  {submitting ? tr("提交中...") : tr("提交评测")}
                 </Button>
               </div>
             </CardContent>
@@ -1152,11 +1163,11 @@ function SubmitTab({
               <div className="flex items-center gap-3 mb-2">
                 <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent shrink-0" />
                 <span className="text-sm font-medium">
-                  {progress.total === 0 ? "排队等待中..." :
-                    progress.phase === "generating" ? `生成答案中... (${progress.completed + 1}/${progress.total} 题)` :
-                    progress.phase === "evaluating" ? `提交评估中... (${progress.completed + 1}/${progress.total} 题)` :
-                    progress.phase === "done" ? "评估完成，同步中..." :
-                    `评测中... ${progress.completed}/${progress.total} 题`}
+                  {progress.total === 0 ? tr("排队等待中...") :
+                    progress.phase === "generating" ? `${tr("生成答案中...")} (${progress.completed + 1}/${progress.total} ${tr("题")})` :
+                    progress.phase === "evaluating" ? `${tr("提交评估中...")} (${progress.completed + 1}/${progress.total} ${tr("题")})` :
+                    progress.phase === "done" ? tr("评估完成，同步中...") :
+                    `${tr("评测中...")} ${progress.completed}/${progress.total} ${tr("题")}`}
                 </span>
               </div>
               {progress.currentQuestion && progress.phase === "generating" && (
@@ -1173,12 +1184,12 @@ function SubmitTab({
         {/* Submission history */}
         <Card>
           <CardHeader className="py-3">
-            <CardTitle className="text-sm">提交记录</CardTitle>
-            <CardDescription className="text-xs">从所有提交中选一份作为「最终提交」参与排名</CardDescription>
+            <CardTitle className="text-sm">{tr("提交记录")}</CardTitle>
+            <CardDescription className="text-xs">{tr("从所有提交中选一份作为「最终提交」参与排名")}</CardDescription>
           </CardHeader>
           <CardContent className="pb-3 space-y-4">
             {submissions.length === 0 ? (
-              <p className="text-xs text-muted-foreground text-center py-4">暂无提交记录</p>
+              <p className="text-xs text-muted-foreground text-center py-4">{tr("暂无提交记录")}</p>
             ) : (
               ["PRELIMINARY", "FINALS"].map((ph) => {
                 const phaseSubs = submissions.filter((s) => s.phase === ph);
@@ -1186,7 +1197,7 @@ function SubmitTab({
                 return (
                   <div key={ph}>
                     <p className="text-xs font-medium text-muted-foreground mb-1.5">
-                      {ph === "PRELIMINARY" ? "海选" : "终赛"}
+                      {ph === "PRELIMINARY" ? tr("海选") : tr("终赛")}
                     </p>
                     <div className="space-y-2">
                       {phaseSubs.map((sub) => {
@@ -1196,11 +1207,11 @@ function SubmitTab({
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-mono font-medium">v{sub.version}</span>
-                                {sub.isFinal && <Badge className="text-[10px] px-1 py-0">最终</Badge>}
+                                {sub.isFinal && <Badge className="text-[10px] px-1 py-0">{tr("最终")}</Badge>}
                                 {sub.status === "SYSERR" ? (
                                   <SysErrTooltip subId={sub.id} authFetch={authFetch} errorMessage={sub.errorMessage} />
                                 ) : (
-                                  <Badge variant={st?.variant} className="text-[10px]">{st?.label}</Badge>
+                                  <Badge variant={st?.variant} className="text-[10px]">{tr(st?.label ?? sub.status)}</Badge>
                                 )}
                               </div>
                               <span className="font-mono text-xs">
@@ -1213,12 +1224,12 @@ function SubmitTab({
                             {(sub.status === "COMPLETED" || sub.status === "SYSERR") && (
                               <div className="flex gap-1 mt-1.5">
                                 <Button variant="ghost" size="sm" className="h-6 px-2 text-xs"
-                                  onClick={() => viewDetail(sub.id)}>详情</Button>
+                                  onClick={() => viewDetail(sub.id)}>{tr("详情")}</Button>
                                 {sub.status === "COMPLETED" && <Button
                                   variant={sub.isFinal ? "default" : "outline"}
                                   size="sm" className="h-6 px-2 text-xs"
                                   onClick={() => toggleFinal(sub.id)}
-                                >{sub.isFinal ? "取消最终" : "选为最终"}</Button>}
+                                >{sub.isFinal ? tr("取消最终") : tr("选为最终")}</Button>}
                               </div>
                             )}
                           </div>
@@ -1237,11 +1248,11 @@ function SubmitTab({
       <Dialog open={!!detailSub} onOpenChange={() => setDetailSub(null)}>
         <DialogContent className="w-[90vw] max-w-5xl sm:max-w-5xl max-h-[88vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>提交详情（仅显示公开题）</DialogTitle>
+            <DialogTitle>{tr("提交详情（仅显示公开题）")}</DialogTitle>
           </DialogHeader>
           {detailSub?.promptSnapshot !== undefined && (
             <div className="border rounded p-3 bg-muted/50 text-xs space-y-1">
-              <p className="font-medium text-muted-foreground">提交时使用的 Prompt / 接入方式</p>
+              <p className="font-medium text-muted-foreground">{tr("提交时使用的 Prompt / 接入方式")}</p>
               {detailSub.promptSnapshot ? (
                 detailSub.promptSnapshot.startsWith("[Dify]") || detailSub.promptSnapshot.startsWith("[Coze]") ? (
                   <p className="font-mono">{detailSub.promptSnapshot}</p>
@@ -1249,7 +1260,7 @@ function SubmitTab({
                   <pre className="whitespace-pre-wrap font-mono">{detailSub.promptSnapshot}</pre>
                 )
               ) : (
-                <p className="text-muted-foreground italic">（未设置 Prompt，直接发送题目）</p>
+                <p className="text-muted-foreground italic">{tr("（未设置 Prompt，直接发送题目）")}</p>
               )}
             </div>
           )}
@@ -1278,7 +1289,7 @@ function SubmitTab({
                     {!isGenErr && ans.rawInput && (
                       <details className="text-xs">
                         <summary className="cursor-pointer text-muted-foreground hover:text-foreground select-none">
-                          LLM 输入 ▸
+                          {tr("LLM 输入")} ▸
                         </summary>
                         <pre className="mt-1 bg-muted rounded p-2 whitespace-pre-wrap font-mono overflow-x-auto max-h-48 overflow-y-auto">{ans.rawInput}</pre>
                       </details>
@@ -1286,22 +1297,22 @@ function SubmitTab({
                     {!isGenErr && ans.rawThinking && (
                       <details className="text-xs">
                         <summary className="cursor-pointer text-amber-700 hover:text-amber-900 select-none">
-                          🧠 思考过程（Thinking）▸
+                          🧠 {tr("思考过程（Thinking）")} ▸
                         </summary>
                         <pre className="mt-1 bg-amber-50 border border-amber-200 rounded p-2 whitespace-pre-wrap font-mono overflow-x-auto max-h-64 overflow-y-auto text-amber-900">{ans.rawThinking}</pre>
                       </details>
                     )}
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">{isGenErr ? "生成错误" : "LLM 输出"}</p>
+                      <p className="text-xs text-muted-foreground mb-1">{isGenErr ? tr("生成错误") : tr("LLM 输出")}</p>
                       <div className={`rounded p-2 text-xs font-mono whitespace-pre-wrap max-h-48 overflow-y-auto ${isGenErr ? "bg-destructive/10 text-destructive" : "bg-muted"}`}>
                         {isGenErr
                           ? stripTechnicalDetails(genErrMsg)
-                          : (ans.rawOutput || "(无输出)")}
+                          : (ans.rawOutput || tr("(无输出)"))}
                       </div>
                     </div>
                     {!isGenErr && ans.judgeReason && (
                       <div className={`text-xs ${ans.score === null ? "text-amber-600" : "text-muted-foreground"}`}>
-                        {ans.score === null ? "评分器错误: " : "评分理由: "}{ans.judgeReason}
+                        {ans.score === null ? `${tr("评分器错误")}: ` : `${tr("评分理由")}: `}{ans.judgeReason}
                       </div>
                     )}
                   </div>
@@ -1334,6 +1345,7 @@ function LeaderboardTab({
   onRefresh: () => void;
 }) {
   const { locale } = useAuth();
+  const tr = useSystemText();
   const showFinals = (taskStatus === "FINALS" || taskStatus === "ENDED") && finalsLeaderboard.length > 0;
   const [phase, setPhase] = useState<"PRELIMINARY" | "FINALS">("PRELIMINARY");
   const [sortBy, setSortBy] = useState<"publicScore" | "privateScore">("publicScore");
@@ -1357,40 +1369,40 @@ function LeaderboardTab({
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            排行榜
-            {isEnded ? <Badge variant="secondary">已结束</Badge> : <Badge>进行中</Badge>}
+            {tr("排行榜")}
+            {isEnded ? <Badge variant="secondary">{tr("已结束")}</Badge> : <Badge>{tr("进行中")}</Badge>}
           </CardTitle>
           <div className="flex items-center gap-2">
             <Button variant={phase === "PRELIMINARY" ? "default" : "outline"} size="sm"
               onClick={() => { setPhase("PRELIMINARY"); setSortBy("publicScore"); }}>
-              海选
+              {tr("海选")}
             </Button>
             {showFinals && (
               <Button variant={phase === "FINALS" ? "default" : "outline"} size="sm"
                 onClick={() => { setPhase("FINALS"); setSortBy("publicScore"); }}>
-                终赛
+                {tr("终赛")}
               </Button>
             )}
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={onRefresh}>刷新</Button>
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={onRefresh}>{tr("刷新")}</Button>
           </div>
         </div>
         <p className="text-xs text-muted-foreground mt-1">
-          测试集得分{isEnded ? "已公开" : "结束后公开"} &nbsp;·&nbsp; 点击列标题排序
+          {tr("测试集得分")}{isEnded ? tr("已公开") : tr("结束后公开")} &nbsp;·&nbsp; {tr("点击列标题排序")}
         </p>
       </CardHeader>
       <CardContent>
         {sorted.length === 0 ? (
-          <p className="text-muted-foreground text-center py-8">暂无提交记录</p>
+          <p className="text-muted-foreground text-center py-8">{tr("暂无提交记录")}</p>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-12">排名</TableHead>
-                <TableHead>姓名</TableHead>
-                <SortHead col="publicScore" label="公开集得分" />
-                {isEnded && <SortHead col="privateScore" label="测试集得分" />}
-                <TableHead className="text-right">提交次数</TableHead>
-                <TableHead className="text-right">提交时间</TableHead>
+                <TableHead className="w-12">{tr("排名")}</TableHead>
+                <TableHead>{tr("姓名")}</TableHead>
+                <SortHead col="publicScore" label={tr("公开集得分")} />
+                {isEnded && <SortHead col="privateScore" label={tr("测试集得分")} />}
+                <TableHead className="text-right">{tr("提交次数")}</TableHead>
+                <TableHead className="text-right">{tr("提交时间")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1401,7 +1413,7 @@ function LeaderboardTab({
                   </TableCell>
                   <TableCell>
                     {e.name}
-                    {e.userId === currentUserId && <span className="ml-1 text-xs text-muted-foreground">(我)</span>}
+                    {e.userId === currentUserId && <span className="ml-1 text-xs text-muted-foreground">({tr("我")})</span>}
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     {`${(e.publicScore * 100).toFixed(1)}%`}
@@ -1427,13 +1439,15 @@ function LeaderboardTab({
 
 // ────────── 颁奖 Tab ──────────
 function StudentAwardTab({ leaderboard, isEnded }: { leaderboard: LeaderboardEntry[]; isEnded: boolean }) {
+  const tr = useSystemText();
+
   if (!isEnded || leaderboard.length === 0) {
     return (
       <Card>
         <CardContent className="py-16 text-center">
           <div className="text-4xl mb-4">🏆</div>
-          <p className="text-xl font-semibold text-muted-foreground">活动进行中</p>
-          <p className="text-sm text-muted-foreground mt-2">颁奖结果将在活动结束后公布</p>
+          <p className="text-xl font-semibold text-muted-foreground">{tr("活动进行中")}</p>
+          <p className="text-sm text-muted-foreground mt-2">{tr("颁奖结果将在活动结束后公布")}</p>
         </CardContent>
       </Card>
     );

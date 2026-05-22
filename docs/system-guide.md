@@ -176,7 +176,7 @@ Arena 支持两类常见竞赛组织方式。
 
 Arena is a Chatbot competition platform for LLM teaching and classroom competitions. Instructors publish activities and configure question banks and judge profiles. Students subscribe to activities, configure a Chatbot or Prompt, and let the system automatically run answers, scoring, leaderboards, and awards.
 
-![Instructor activity detail](assets/system-03-admin-task-overview-en.png)
+![Instructor task creation](assets/system-03-admin-task-overview-en.png)
 
 ## 1. Roles and Use Cases
 

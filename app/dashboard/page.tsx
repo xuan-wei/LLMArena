@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
+import { translateSystemText } from "@/lib/i18n";
 
 interface Task {
   id: string;
@@ -41,6 +42,7 @@ export default function DashboardPage() {
 
 function DashboardContent() {
   const { user, loading, authFetch, refreshUser, locale } = useAuth();
+  const tr = (text: string) => translateSystemText(locale === "zh-CN" ? "zh" : "en", text);
   const router = useRouter();
   const searchParams = useSearchParams();
   const refreshedRef = useRef(false);
@@ -198,11 +200,11 @@ function DashboardContent() {
     <div>
       <Navbar />
       <main className="max-w-5xl mx-auto px-4 py-8">
-        <h1 className="text-xl font-bold mb-6">活动广场</h1>
+        <h1 className="text-xl font-bold mb-6">{tr("活动广场")}</h1>
         <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="mb-4">
-            <TabsTrigger value="subscribed">我订阅的 ({subscribedTasks.length})</TabsTrigger>
-            <TabsTrigger value="mine">我发布的 {canPublish ? `(${myTasks.length})` : ""}</TabsTrigger>
+            <TabsTrigger value="subscribed">{tr("我订阅的")} ({subscribedTasks.length})</TabsTrigger>
+            <TabsTrigger value="mine">{tr("我发布的")} {canPublish ? `(${myTasks.length})` : ""}</TabsTrigger>
           </TabsList>
 
           {/* Subscribed tab */}
@@ -226,7 +228,7 @@ function DashboardContent() {
                           : "bg-muted text-muted-foreground hover:bg-muted/80"
                       }`}
                     >
-                      {label}{count > 0 && ` (${count})`}
+                      {tr(label)}{count > 0 && ` (${count})`}
                     </button>
                   );
                 })}
@@ -234,18 +236,18 @@ function DashboardContent() {
               <Button size="sm" onClick={() => setSubOpen(true)}>+ 输入订阅码</Button>
             </div>
             {subscribedTasks.length === 0 ? (
-              <p className="text-muted-foreground text-center py-16">还未订阅任何活动，输入订阅码加入</p>
+              <p className="text-muted-foreground text-center py-16">{tr("还未订阅任何活动，输入订阅码加入")}</p>
             ) : filteredSubscribedTasks.length === 0 ? (
-              <p className="text-muted-foreground text-center py-16">没有符合条件的活动</p>
+              <p className="text-muted-foreground text-center py-16">{tr("没有符合条件的活动")}</p>
             ) : (
               <div className="rounded-xl border border-border/60 overflow-hidden bg-white">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/30 hover:bg-muted/30">
-                      <TableHead className="font-medium">活动名称</TableHead>
-                      <TableHead className="w-24 font-medium">状态</TableHead>
-                      <TableHead className="w-16 text-center font-medium">题目</TableHead>
-                      <TableHead className="w-32 font-medium">创建时间</TableHead>
+                      <TableHead className="font-medium">{tr("活动名称")}</TableHead>
+                      <TableHead className="w-24 font-medium">{tr("状态")}</TableHead>
+                      <TableHead className="w-16 text-center font-medium">{tr("题目")}</TableHead>
+                      <TableHead className="w-32 font-medium">{tr("创建时间")}</TableHead>
                       <TableHead className="w-28" />
                     </TableRow>
                   </TableHeader>
@@ -256,7 +258,7 @@ function DashboardContent() {
                         <TableRow key={task.id}>
                           <TableCell className="font-medium">{task.title}</TableCell>
                           <TableCell>
-                            {s && <Badge variant="outline" className={`${s.className} text-xs`}>{s.label}</Badge>}
+                            {s && <Badge variant="outline" className={`${s.className} text-xs`}>{tr(s.label)}</Badge>}
                           </TableCell>
                           <TableCell className="text-center text-sm text-muted-foreground">{task._count.questions}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">
@@ -265,11 +267,11 @@ function DashboardContent() {
                           <TableCell>
                             <div className="flex items-center gap-1">
                               <Button size="sm" className="h-7 px-2 text-xs"
-                                onClick={() => router.push(`/tasks/${task.id}`)}>进入</Button>
+                                onClick={() => router.push(`/tasks/${task.id}`)}>{tr("进入")}</Button>
                               {task.status === "PRELIMINARY" && (
                                 <Button size="sm" variant="ghost"
                                   className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                                  onClick={() => handleUnsubscribe(task.id)}>退订</Button>
+                                  onClick={() => handleUnsubscribe(task.id)}>{tr("退订")}</Button>
                               )}
                             </div>
                           </TableCell>
@@ -282,9 +284,9 @@ function DashboardContent() {
             )}
             {subTotalPages > 1 && (
               <div className="flex items-center justify-center gap-3 mt-4">
-                <Button variant="outline" size="sm" onClick={() => setSubPage((p) => p - 1)} disabled={subPage <= 1}>上一页</Button>
-                <span className="text-sm text-muted-foreground">第 {subPage} / {subTotalPages} 页</span>
-                <Button variant="outline" size="sm" onClick={() => setSubPage((p) => p + 1)} disabled={subPage >= subTotalPages}>下一页</Button>
+                <Button variant="outline" size="sm" onClick={() => setSubPage((p) => p - 1)} disabled={subPage <= 1}>{tr("上一页")}</Button>
+                <span className="text-sm text-muted-foreground">{tr("第")} {subPage} / {subTotalPages} {tr("页")}</span>
+                <Button variant="outline" size="sm" onClick={() => setSubPage((p) => p + 1)} disabled={subPage >= subTotalPages}>{tr("下一页")}</Button>
               </div>
             )}
           </TabsContent>
@@ -314,31 +316,31 @@ function DashboardContent() {
                               : "bg-muted text-muted-foreground hover:bg-muted/80"
                           }`}
                         >
-                          {label}{count > 0 && ` (${count})`}
+                          {tr(label)}{count > 0 && ` (${count})`}
                         </button>
                       );
                     })}
                   </div>
                   <Link href="/admin/tasks/new">
-                    <Button size="sm">+ 创建活动</Button>
+                    <Button size="sm">{tr("+ 创建活动")}</Button>
                   </Link>
                 </div>
 
                 {filteredMyTasks.length === 0 ? (
                   <p className="text-muted-foreground text-center py-16">
-                    {myTasks.length === 0 ? "还没有发布活动" : "没有符合条件的活动"}
+                    {myTasks.length === 0 ? tr("还没有发布活动") : tr("没有符合条件的活动")}
                   </p>
                 ) : (<>
                   <div className="rounded-xl border border-border/60 overflow-hidden bg-white">
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-muted/30 hover:bg-muted/30">
-                          <TableHead className="font-medium">活动名称</TableHead>
-                          <TableHead className="w-24 font-medium">状态</TableHead>
-                          <TableHead className="w-16 text-center font-medium">题目</TableHead>
-                          <TableHead className="w-20 text-center font-medium">订阅人数</TableHead>
-                          <TableHead className="w-24 font-medium">订阅码</TableHead>
-                          <TableHead className="w-32 font-medium">创建时间</TableHead>
+                          <TableHead className="font-medium">{tr("活动名称")}</TableHead>
+                          <TableHead className="w-24 font-medium">{tr("状态")}</TableHead>
+                          <TableHead className="w-16 text-center font-medium">{tr("题目")}</TableHead>
+                          <TableHead className="w-20 text-center font-medium">{tr("订阅人数")}</TableHead>
+                          <TableHead className="w-24 font-medium">{tr("订阅码")}</TableHead>
+                          <TableHead className="w-32 font-medium">{tr("创建时间")}</TableHead>
                           <TableHead className="w-28" />
                         </TableRow>
                       </TableHeader>
@@ -349,19 +351,19 @@ function DashboardContent() {
                             <TableRow key={task.id}>
                               <TableCell className="font-medium">{task.title}</TableCell>
                               <TableCell>
-                                {s && <Badge variant="outline" className={`${s.className} text-xs`}>{s.label}</Badge>}
+                                {s && <Badge variant="outline" className={`${s.className} text-xs`}>{tr(s.label)}</Badge>}
                               </TableCell>
                               <TableCell className="text-center text-sm text-muted-foreground">{task._count.questions}</TableCell>
                               <TableCell className="text-center text-sm text-muted-foreground">{task._count.enrollments}</TableCell>
                               <TableCell className="font-mono text-sm">
                                 {task.subscribeCode ? (
                                   <button
-                                    title="点击复制"
+                                    title={tr("点击复制")}
                                     className={`hover:opacity-70 transition-opacity cursor-pointer ${task.subscribeCodeEnabled ? "text-primary" : "text-muted-foreground line-through"}`}
                                     onClick={() => {
                                       const code = task.subscribeCode!;
                                       if (navigator.clipboard?.writeText) {
-                                        navigator.clipboard.writeText(code).then(() => toast.success("已复制订阅码"));
+                                        navigator.clipboard.writeText(code).then(() => toast.success(tr("已复制订阅码")));
                                       } else {
                                         const el = document.createElement("textarea");
                                         el.value = code;
@@ -369,7 +371,7 @@ function DashboardContent() {
                                         el.select();
                                         document.execCommand("copy");
                                         document.body.removeChild(el);
-                                        toast.success("已复制订阅码");
+                                        toast.success(tr("已复制订阅码"));
                                       }
                                     }}
                                   >{task.subscribeCode}</button>
@@ -387,19 +389,19 @@ function DashboardContent() {
                                     variant="outline"
                                     className="h-7 px-2 text-xs"
                                     onClick={() => router.push(`/admin/tasks/${task.id}`)}
-                                  >详情</Button>
+                                  >{tr("详情")}</Button>
                                   <Button
                                     size="sm"
                                     variant="outline"
                                     className="h-7 px-2 text-xs"
                                     onClick={() => handleCloneTask(task.id)}
-                                  >克隆</Button>
+                                  >{tr("克隆")}</Button>
                                   <Button
                                     size="sm"
                                     variant="ghost"
                                     className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
                                     onClick={() => handleDeleteTask(task.id)}
-                                  >删除</Button>
+                                  >{tr("删除")}</Button>
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -410,9 +412,9 @@ function DashboardContent() {
                   </div>
                   {mineTotalPages > 1 && (
                     <div className="flex items-center justify-center gap-3 mt-4">
-                      <Button variant="outline" size="sm" onClick={() => setMinePage((p) => p - 1)} disabled={minePage <= 1}>上一页</Button>
-                      <span className="text-sm text-muted-foreground">第 {minePage} / {mineTotalPages} 页</span>
-                      <Button variant="outline" size="sm" onClick={() => setMinePage((p) => p + 1)} disabled={minePage >= mineTotalPages}>下一页</Button>
+                      <Button variant="outline" size="sm" onClick={() => setMinePage((p) => p - 1)} disabled={minePage <= 1}>{tr("上一页")}</Button>
+                      <span className="text-sm text-muted-foreground">{tr("第")} {minePage} / {mineTotalPages} {tr("页")}</span>
+                      <Button variant="outline" size="sm" onClick={() => setMinePage((p) => p + 1)} disabled={minePage >= mineTotalPages}>{tr("下一页")}</Button>
                     </div>
                   )}
                 </>)}
