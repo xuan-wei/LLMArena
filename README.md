@@ -3,6 +3,16 @@
 一个面向大模型教学和课堂竞赛的 Chatbot 竞技平台，类似 Kaggle。
 教师可以发布活动、配置题库和评分器；学生订阅活动后提交 Prompt 或 Chatbot/API 配置；系统自动调用模型逐题作答、评分、排行，并在活动结束后展示颁奖结果。适用于 Prompt 设计大赛、智能体大赛和课程实践活动。
 
+## 界面预览
+
+教师可以在活动广场中创建、克隆和管理竞赛活动：
+
+![教师活动列表](docs/assets/system-02-admin-dashboard.png)
+
+学生进入活动后，可以完成报名、配置 Chatbot 或 Prompt、试跑公开题并提交评测：
+
+![学生活动页](docs/assets/system-05-student-task.png)
+
 ## 功能特性
 
 - **四种参与模式**：管理员统一 LLM（学生只写 Prompt）/ OpenAI Compatible API / Dify / Coze
