@@ -1,7 +1,7 @@
 # LLM Arena — Chatbot 竞技场
 
-一个供学生提交 Chatbot 配置并自动评分的竞赛平台，类似 Kaggle。
-学生提交 Prompt 或 API 配置，系统自动调用学生的 LLM 逐题作答，由 LLM Judge 评分，最终以排行榜和颁奖的形式呈现。适用于大学课程教学场景。
+一个面向大模型教学和课堂竞赛的 Chatbot 竞技平台，类似 Kaggle。
+教师可以发布活动、配置题库和评分器；学生订阅活动后提交 Prompt 或 Chatbot/API 配置；系统自动调用模型逐题作答、评分、排行，并在活动结束后展示颁奖结果。适用于 Prompt 设计大赛、智能体大赛和课程实践活动。
 
 ## 功能特性
 
@@ -25,11 +25,21 @@
 | 部署 | Docker (node:20-alpine)，三阶段构建 |
 | Worker | 独立 worker thread，esbuild 打包 |
 
-## 使用说明书
+## 在线体验与说明书
 
-- [Arena 系统说明书](docs/system-guide.md)
-- [大模型 Prompt 设计大赛配置指南](docs/prompt-contest-guide.md)
-- [大模型智能体大赛配置指南](docs/agent-contest-guide.md)
+在线 Demo 已开放给教师和学生测试：
+
+- Demo 地址：https://arena.sjtu.edu.cn
+- Demo 活动：`Demo: Game 24（算24点）`
+- 订阅码：`945351`
+
+建议测试流程：注册或登录后进入“活动广场”，点击“输入订阅码”，输入 `945351` 加入 Demo 活动，然后按活动页提示完成报名、配置 Prompt 或 Chatbot、试跑公开题并查看排行榜。
+
+使用说明书：
+
+- [Arena 系统说明书](docs/system-guide.md)：平台角色、活动生命周期、题库分组、评分器、学生流程和上线检查清单。
+- [大模型 Prompt 设计大赛（算 24 点）配置指南](docs/prompt-contest-guide.md)：教师统一提供模型，学生只设计 Prompt 的推荐配置流程。
+- [大模型智能体大赛（算 24 点）配置指南](docs/agent-contest-guide.md)：学生自行接入 OpenAI 兼容 API / Dify / Coze 的智能体大赛配置流程。
 
 ## 快速部署（Docker）
 
