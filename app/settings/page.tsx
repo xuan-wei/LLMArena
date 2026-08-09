@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { toast } from "sonner";
 
 export default function SettingsPage() {
-  const { user, authFetch } = useAuth();
+  const { user, authFetch, applyToken } = useAuth();
   const [form, setForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [saving, setSaving] = useState(false);
   const [sendingReset, setSendingReset] = useState(false);
@@ -26,6 +26,7 @@ export default function SettingsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "修改失败");
+      if (data.token) applyToken(data.token);
       toast.success("密码已修改");
       setForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
     } catch (e) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getUser, verifyPassword, hashPassword } from "@/lib/auth";
+import { getUser, verifyPassword, hashPassword, signJWT, verifyJWT } from "@/lib/auth";
 import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function POST(request: Request) {
@@ -15,6 +15,13 @@ export async function POST(request: Request) {
   if (!dbUser.passwordHash) return NextResponse.json({ error: st(lang, "api.ssoPasswordUnavailable") }, { status: 400 });
   const valid = await verifyPassword(currentPassword, dbUser.passwordHash);
   if (!valid) return NextResponse.json({ error: st(lang, "api.currentPasswordIncorrect") }, { status: 400 });
-  await prisma.user.update({ where: { id: user.sub }, data: { passwordHash: await hashPassword(newPassword) } });
-  return NextResponse.json({ ok: true });
+  // Issue a fresh token first so this session survives, then stamp
+  // passwordChangedAt to exactly its iat — every older session is invalidated.
+  const token = signJWT({ sub: dbUser.id, email: dbUser.email, role: dbUser.role, name: dbUser.name, canPublish: dbUser.canPublish });
+  const iat = verifyJWT(token)?.iat ?? Math.floor(Date.now() / 1000);
+  await prisma.user.update({
+    where: { id: user.sub },
+    data: { passwordHash: await hashPassword(newPassword), passwordChangedAt: new Date(iat * 1000) },
+  });
+  return NextResponse.json({ ok: true, token });
 }

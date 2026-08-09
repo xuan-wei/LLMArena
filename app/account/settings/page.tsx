@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { toast } from "sonner";
 
 export default function SettingsPage() {
-  const { user, loading, authFetch, setLanguage, t, refreshUser } = useAuth();
+  const { user, loading, authFetch, setLanguage, t, refreshUser, applyToken } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -57,6 +57,7 @@ export default function SettingsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t("account.settings.changeFailed"));
+      if (data.token) applyToken(data.token);
       toast.success(t("account.settings.passwordChanged"));
       setForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
     } catch (e) {

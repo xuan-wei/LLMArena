@@ -14,6 +14,8 @@ export interface JwtPayload {
   role: string;
   name: string;
   canPublish?: boolean;
+  iat?: number;
+  exp?: number;
 }
 
 export function hashPassword(password: string): Promise<string> {
@@ -62,15 +64,23 @@ export function getUser(request: Request): JwtPayload | null {
 /**
  * Like getUser() but fetches fresh canPublish and role from the DB so that
  * permission changes take effect immediately without requiring re-login.
- * Use this in any route that checks canPublishTasks / canManageTask.
+ * Also enforces session invalidation: a token issued before the account's
+ * last password change (passwordChangedAt) is rejected, so changing/resetting
+ * a password kills all older sessions.
+ * Use this in any route that checks canPublishTasks / canManageTask / role.
  */
 export async function getUserFresh(request: Request): Promise<JwtPayload | null> {
   const payload = getUser(request);
   if (!payload) return null;
   const dbUser = await prisma.user.findUnique({
     where: { id: payload.sub },
-    select: { canPublish: true, role: true },
+    select: { canPublish: true, role: true, passwordChangedAt: true },
   });
   if (!dbUser) return null;
+  // Reject tokens minted before the last password change.
+  if (dbUser.passwordChangedAt && typeof payload.iat === "number") {
+    const changedSec = Math.floor(dbUser.passwordChangedAt.getTime() / 1000);
+    if (payload.iat < changedSec) return null;
+  }
   return { ...payload, canPublish: dbUser.canPublish, role: dbUser.role };
 }

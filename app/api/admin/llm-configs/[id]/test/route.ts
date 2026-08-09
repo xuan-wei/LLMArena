@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getUser } from "@/lib/auth";
+import { getUserFresh } from "@/lib/auth";
 import { getRequestLanguage, st } from "@/lib/i18n/server";
 import OpenAI from "openai";
 
@@ -13,7 +13,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = getUser(request);
+  const user = await getUserFresh(request);
   const lang = await getRequestLanguage(request);
   if (!user || (user.role !== "ADMIN" && !user.canPublish)) {
     return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });

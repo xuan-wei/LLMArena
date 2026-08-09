@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getUser } from "@/lib/auth";
+import { getUserFresh } from "@/lib/auth";
 import { isAdmin } from "@/lib/permissions";
 import { sendPublisherGrantedEmail, sendPublisherRejectedEmail } from "@/lib/email";
 import { getRequestLanguage, st } from "@/lib/i18n/server";
@@ -10,7 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const lang = await getRequestLanguage(request);
-  const user = getUser(request);
+  const user = await getUserFresh(request);
   if (!isAdmin(user)) return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
 
   const { id } = await params;
@@ -30,7 +30,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const lang = await getRequestLanguage(request);
-  const user = getUser(request);
+  const user = await getUserFresh(request);
   if (!isAdmin(user)) return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
 
   const { id } = await params;

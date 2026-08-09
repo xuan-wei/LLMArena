@@ -17,6 +17,9 @@ model User {
   canPublish    Boolean  @default(false)
   language      String   @default("zh")
   createdAt     DateTime @default(now())
+  // Set whenever the password changes (self-service, reset, or admin reset).
+  // Tokens whose iat predates this are rejected — invalidates old sessions.
+  passwordChangedAt DateTime?
   // SSO fields — null for password-registered users
   institution   String?  // provider id, e.g. "jaccount"
   institutionId String?  // 学号/工号 as provided by the institution

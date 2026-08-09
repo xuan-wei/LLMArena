@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getUser } from "@/lib/auth";
+import { getUserFresh } from "@/lib/auth";
 import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 const ALLOWED_KEYS = [
@@ -15,7 +15,7 @@ const ALLOWED_KEYS = [
 
 export async function GET(request: Request) {
   const lang = await getRequestLanguage(request);
-  const user = getUser(request);
+  const user = await getUserFresh(request);
   if (!user || user.role !== "ADMIN") {
     return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
   }
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   const lang = await getRequestLanguage(request);
-  const user = getUser(request);
+  const user = await getUserFresh(request);
   if (!user || user.role !== "ADMIN") {
     return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
   }

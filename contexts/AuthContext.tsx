@@ -23,6 +23,7 @@ interface AuthContextType {
   register: (email: string, name: string, password: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  applyToken: (token: string) => void;
   setPublicLanguage: (language: Language) => void;
   setLanguage: (language: Language) => Promise<void>;
   t: (key: I18nKey, params?: I18nParams) => string;
@@ -116,6 +117,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (data.user) setUser(data.user);
   };
 
+  // Adopt a freshly-issued token (e.g. after a password change re-issues one
+  // so the current session survives while older sessions are invalidated).
+  const applyToken = useCallback((newToken: string) => {
+    localStorage.setItem("arena_token", newToken);
+    setToken(newToken);
+  }, []);
+
   const setLanguage = async (language: Language) => {
     const res = await authFetch("/api/account/preferences", {
       method: "PATCH",
@@ -164,7 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, publicLanguage, locale, login, register, logout, refreshUser, setPublicLanguage, setLanguage, t, authFetch }}
+      value={{ user, token, loading, publicLanguage, locale, login, register, logout, refreshUser, applyToken, setPublicLanguage, setLanguage, t, authFetch }}
     >
       {children}
     </AuthContext.Provider>

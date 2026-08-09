@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getUser } from "@/lib/auth";
+import { getUserFresh } from "@/lib/auth";
 import { cascadeDeleteUsers } from "@/lib/deleteUser";
 import { getRequestLanguage, st } from "@/lib/i18n/server";
 
 export async function GET(request: Request) {
   const lang = await getRequestLanguage(request);
-  const user = getUser(request);
+  const user = await getUserFresh(request);
   if (!user || user.role !== "ADMIN") return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
 
   const url = new URL(request.url);
@@ -67,7 +67,7 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   const lang = await getRequestLanguage(request);
-  const user = getUser(request);
+  const user = await getUserFresh(request);
   if (!user || user.role !== "ADMIN") return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
 
   const { ids, action, value } = await request.json() as {
@@ -113,7 +113,7 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   const lang = await getRequestLanguage(request);
-  const user = getUser(request);
+  const user = await getUserFresh(request);
   if (!user || user.role !== "ADMIN") return NextResponse.json({ error: st(lang, "api.noPermission") }, { status: 403 });
   const { ids } = await request.json() as { ids: string[] };
   if (!Array.isArray(ids) || ids.length === 0) return NextResponse.json({ error: st(lang, "api.provideUserIds") }, { status: 400 });
