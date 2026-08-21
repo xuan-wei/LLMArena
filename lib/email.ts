@@ -111,3 +111,16 @@ export async function sendPasswordResetEmail(to: string, name: string, resetLink
       : `<p>Hello ${escapeHtml(name)},</p><p>You requested a password reset. Click the link below within 1 hour to reset your password:</p><p><a href="${sanitizeUrl(resetLink)}">${escapeHtml(resetLink)}</a></p><p>If you did not request this, please ignore this email.</p>`,
   );
 }
+
+export async function sendEmailVerificationCode(to: string, name: string, code: string, language: unknown = "en") {
+  const lang = normalizeLanguage(language);
+  const safeName = escapeHtml(name);
+  const safeCode = escapeHtml(code);
+  await sendEmail(
+    to,
+    lang === "zh" ? "【LLM Arena】邮箱验证码" : "[LLM Arena] Email verification code",
+    lang === "zh"
+      ? `<p>你好 ${safeName}，</p><p>您的邮箱验证码为：</p><p style="font-size:22px;font-weight:bold;letter-spacing:3px;">${safeCode}</p><p>验证码 10 分钟内有效。如果您没有发起此请求，请忽略此邮件。</p>`
+      : `<p>Hello ${safeName},</p><p>Your email verification code is:</p><p style="font-size:22px;font-weight:bold;letter-spacing:3px;">${safeCode}</p><p>The code is valid for 10 minutes. If you did not request this, please ignore this email.</p>`,
+  );
+}

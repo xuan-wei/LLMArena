@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser } from "@/lib/auth";
 import { getRequestLanguage, st } from "@/lib/i18n/server";
+import { requireVerified } from "@/lib/authGuard";
 
 export async function PUT(
   request: Request,
@@ -10,6 +11,7 @@ export async function PUT(
   const user = getUser(request);
   const lang = await getRequestLanguage(request);
   if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
+  const blocked = requireVerified(user, lang); if (blocked) return blocked;
 
   const { id } = await params;
   const existing = await prisma.studentLLMConfig.findFirst({ where: { id, userId: user.sub } });
@@ -35,6 +37,7 @@ export async function DELETE(
   const user = getUser(request);
   const lang = await getRequestLanguage(request);
   if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
+  const blocked = requireVerified(user, lang); if (blocked) return blocked;
 
   const { id } = await params;
   const existing = await prisma.studentLLMConfig.findFirst({ where: { id, userId: user.sub } });

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getUser, getUserFresh } from "@/lib/auth";
 import { canManageTask } from "@/lib/permissions";
 import { getRequestLanguage, st } from "@/lib/i18n/server";
+import { requireVerified } from "@/lib/authGuard";
 
 function generateCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -15,6 +16,7 @@ export async function POST(
 ) {
   const lang = await getRequestLanguage(request);
   const user = await getUserFresh(request);
+  const blocked = requireVerified(user, lang); if (blocked) return blocked;
   const { id } = await params;
 
   const task = await prisma.task.findUnique({ where: { id }, select: { id: true, createdBy: true } });
@@ -48,6 +50,7 @@ export async function PATCH(
 ) {
   const lang = await getRequestLanguage(request);
   const user = await getUserFresh(request);
+  const blocked = requireVerified(user, lang); if (blocked) return blocked;
   const { id } = await params;
 
   const task = await prisma.task.findUnique({ where: { id }, select: { id: true, createdBy: true } });

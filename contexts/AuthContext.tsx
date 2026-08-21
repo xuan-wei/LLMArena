@@ -11,6 +11,7 @@ interface User {
   role: "ADMIN" | "STUDENT";
   canPublish: boolean;
   language: Language;
+  emailVerified: boolean;
 }
 
 interface AuthContextType {
@@ -20,7 +21,7 @@ interface AuthContextType {
   publicLanguage: Language;
   locale: string;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, name: string, password: string) => Promise<void>;
+  register: (email: string, name: string, password: string, code: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
   applyToken: (token: string) => void;
@@ -87,11 +88,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/dashboard");
   };
 
-  const register = async (email: string, name: string, password: string) => {
+  const register = async (email: string, name: string, password: string, code: string) => {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, name, password, language: publicLanguage }),
+      body: JSON.stringify({ email, name, password, code, language: publicLanguage }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(translateJsonMessages(publicLanguage, data).error || tFor(publicLanguage, "auth.registerFailed"));

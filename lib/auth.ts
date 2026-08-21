@@ -14,6 +14,7 @@ export interface JwtPayload {
   role: string;
   name: string;
   canPublish?: boolean;
+  emailVerified?: boolean;
   iat?: number;
   exp?: number;
 }
@@ -74,7 +75,7 @@ export async function getUserFresh(request: Request): Promise<JwtPayload | null>
   if (!payload) return null;
   const dbUser = await prisma.user.findUnique({
     where: { id: payload.sub },
-    select: { canPublish: true, role: true, passwordChangedAt: true },
+    select: { canPublish: true, role: true, passwordChangedAt: true, emailVerified: true },
   });
   if (!dbUser) return null;
   // Reject tokens minted before the last password change.
@@ -82,5 +83,5 @@ export async function getUserFresh(request: Request): Promise<JwtPayload | null>
     const changedSec = Math.floor(dbUser.passwordChangedAt.getTime() / 1000);
     if (payload.iat < changedSec) return null;
   }
-  return { ...payload, canPublish: dbUser.canPublish, role: dbUser.role };
+  return { ...payload, canPublish: dbUser.canPublish, role: dbUser.role, emailVerified: dbUser.emailVerified };
 }

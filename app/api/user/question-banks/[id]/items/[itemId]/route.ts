@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser } from "@/lib/auth";
 import { getRequestLanguage, st } from "@/lib/i18n/server";
+import { requireVerified } from "@/lib/authGuard";
 
 export async function DELETE(
   request: Request,
@@ -10,6 +11,7 @@ export async function DELETE(
   const lang = await getRequestLanguage(request);
   const user = getUser(request);
   if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
+  const blocked = requireVerified(user, lang); if (blocked) return blocked;
 
   const { id, itemId } = await params;
   // Ensure the bank belongs to the user (personal only)

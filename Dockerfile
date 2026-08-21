@@ -61,6 +61,11 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/node_modules/.prisma  ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma  ./node_modules/@prisma
 
+# svg-captcha is kept external (serverExternalPackages) and loads a bundled
+# .ttf via __dirname; copy it and its dep so the font resolves at runtime.
+COPY --from=builder /app/node_modules/svg-captcha ./node_modules/svg-captcha
+COPY --from=builder /app/node_modules/opentype.js ./node_modules/opentype.js
+
 # Copy empty DB template (schema already applied during build)
 COPY --from=builder --chown=nextjs:nodejs /app/template.db /app/template.db
 

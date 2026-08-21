@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getUser } from "@/lib/auth";
 import { parseCSV } from "@/lib/csv";
 import { getRequestLanguage, st } from "@/lib/i18n/server";
+import { requireVerified } from "@/lib/authGuard";
 
 export async function POST(
   request: Request,
@@ -11,6 +12,7 @@ export async function POST(
   const lang = await getRequestLanguage(request);
   const user = getUser(request);
   if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
+  const blocked = requireVerified(user, lang); if (blocked) return blocked;
 
   const { id } = await params;
   // Only own personal banks

@@ -5,6 +5,7 @@ import { callDifyStream } from "@/lib/chatbot/difyMode";
 import { callCoze } from "@/lib/chatbot/cozeMode";
 import type { ChatbotConfig } from "@/lib/chatbot";
 import { getRequestLanguage, st } from "@/lib/i18n/server";
+import { requireVerified } from "@/lib/authGuard";
 
 export async function POST(
   request: Request,
@@ -13,6 +14,7 @@ export async function POST(
   const lang = await getRequestLanguage(request);
   const user = getUser(request);
   if (!user) return new Response(JSON.stringify({ error: st(lang, "auth.notLoggedIn") }), { status: 401 });
+  const blocked = requireVerified(user, lang); if (blocked) return blocked;
 
   const { id } = await params;
   const { questionId, prompt: promptOverride } = await request.json();

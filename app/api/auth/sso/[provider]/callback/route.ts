@@ -62,6 +62,6 @@ export async function GET(
   const displayName = name || sub;
 
   const user = await upsertSSOUser(email, displayName, providerId, institutionId);
-  const token = signJWT({ sub: user.id, email: user.email, role: user.role, name: user.name ?? displayName, canPublish: user.canPublish });
+  const token = signJWT({ sub: user.id, email: user.email, role: user.role, name: user.name ?? displayName, canPublish: user.canPublish, emailVerified: user.emailVerified });
   return NextResponse.redirect(`${userOrigin}/sso-success?token=${token}`);
 }

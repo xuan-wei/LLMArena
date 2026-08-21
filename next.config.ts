@@ -9,6 +9,9 @@ const extraDevOrigins = process.env.ALLOWED_DEV_ORIGINS
 const nextConfig: NextConfig = {
   output: "standalone",
   allowedDevOrigins: extraDevOrigins,
+  // svg-captcha loads a bundled .ttf via __dirname at runtime; keep it as a
+  // real node_modules require so the font path resolves (not bundled to /ROOT).
+  serverExternalPackages: ["svg-captcha"],
   // Prevent stale Server Action IDs after redeployment.
   // /_next/static/ files are content-hashed so they're safe to cache long-term.
   // All HTML pages must not be cached so browsers always fetch the latest build.

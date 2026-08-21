@@ -20,6 +20,9 @@ model User {
   // Set whenever the password changes (self-service, reset, or admin reset).
   // Tokens whose iat predates this are rejected — invalidates old sessions.
   passwordChangedAt DateTime?
+  // Whether the user has proven ownership of their email (OTP). SSO users and
+  // pre-existing admins are verified; other pre-existing users are not.
+  emailVerified Boolean  @default(false)
   // SSO fields — null for password-registered users
   institution   String?  // provider id, e.g. "jaccount"
   institutionId String?  // 学号/工号 as provided by the institution
@@ -345,6 +348,21 @@ model PasswordResetToken {
   token     String   @unique
   expiresAt DateTime
   used      Boolean  @default(false)
+}
+
+// Email OTP codes for registration, verifying an existing email, or changing
+// email. Keyed by email (registration has no user row yet), not by userId.
+model EmailVerificationCode {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  purpose   String   // "register" | "verify" | "change"
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([email, purpose])
 }
 
 model SiteStat {

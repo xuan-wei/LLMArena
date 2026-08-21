@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUser } from "@/lib/auth";
 import { getRequestLanguage, st } from "@/lib/i18n/server";
+import { requireVerified } from "@/lib/authGuard";
 
 export async function GET(request: Request) {
   const lang = await getRequestLanguage(request);
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
   const lang = await getRequestLanguage(request);
   const user = getUser(request);
   if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
+  const blocked = requireVerified(user, lang); if (blocked) return blocked;
 
   const { name, description } = await request.json();
   if (!name?.trim()) return NextResponse.json({ error: st(lang, "api.nameRequired") }, { status: 400 });

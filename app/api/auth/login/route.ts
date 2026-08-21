@@ -44,11 +44,12 @@ export async function POST(request: Request) {
       role: user.role,
       name: user.name,
       canPublish: user.canPublish,
+      emailVerified: user.emailVerified,
     });
 
     return NextResponse.json({
       token,
-      user: { id: user.id, email: user.email, name: user.name, role: user.role, canPublish: user.canPublish, language: user.language },
+      user: { id: user.id, email: user.email, name: user.name, role: user.role, canPublish: user.canPublish, language: user.language, emailVerified: user.emailVerified },
     });
   } catch (error) {
     console.error("Login error:", error);

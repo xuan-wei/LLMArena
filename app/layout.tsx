@@ -5,6 +5,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { Toaster } from "@/components/ui/sonner";
 import { Footer } from "@/components/layout/Footer";
 import { I18nClient } from "@/components/I18nClient";
+import { EmailVerificationGate } from "@/components/EmailVerificationGate";
 
 const geist = Geist({
   variable: "--font-geist",
@@ -26,7 +27,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-background">
         <AuthProvider>
           <div className="flex flex-col min-h-screen">
-            <div className="flex-1 flex flex-col">{children}</div>
+            <div className="flex-1 flex flex-col"><EmailVerificationGate>{children}</EmailVerificationGate></div>
             <Footer
               copyright={process.env.FOOTER_COPYRIGHT}
               icp={process.env.FOOTER_ICP}

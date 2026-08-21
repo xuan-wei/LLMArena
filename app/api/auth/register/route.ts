@@ -5,6 +5,7 @@ import { sendWelcomeEmail } from "@/lib/email";
 import { st } from "@/lib/i18n/server";
 import { normalizeLanguage } from "@/lib/i18n";
 import { rateLimit, getClientIP } from "@/lib/rateLimit";
+import { consumeCode } from "@/lib/emailVerification";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const WINDOW_MS = 3600000; // 1 hour
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { email: rawEmail, name: rawName, password, language } = await request.json();
+    const { email: rawEmail, name: rawName, password, code, language } = await request.json();
     lang = normalizeLanguage(language);
 
     if (!rawEmail || !rawName || !password) {
@@ -56,14 +57,24 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!code) {
+      return NextResponse.json({ error: st(lang, "api.codeRequired") }, { status: 400 });
+    }
+
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
       return NextResponse.json({ error: st(lang, "auth.emailExists") }, { status: 409 });
     }
 
+    const codeResult = await consumeCode(email, "register", String(code));
+    if (!codeResult.ok) {
+      const key = codeResult.reason === "tooManyAttempts" ? "api.tooManyAttempts" : "api.codeInvalidOrExpired";
+      return NextResponse.json({ error: st(lang, key) }, { status: 400 });
+    }
+
     const passwordHash = await hashPassword(password);
     const user = await prisma.user.create({
-      data: { email, name, passwordHash, language: lang },
+      data: { email, name, passwordHash, language: lang, emailVerified: true },
     });
 
     const token = signJWT({
@@ -72,12 +83,13 @@ export async function POST(request: Request) {
       role: user.role,
       name: user.name,
       canPublish: user.canPublish,
+      emailVerified: user.emailVerified,
     });
 
     sendWelcomeEmail(user.email, user.name, user.language).catch(console.error);
 
     return NextResponse.json(
-      { token, user: { id: user.id, email: user.email, name: user.name, role: user.role, canPublish: user.canPublish, language: user.language } },
+      { token, user: { id: user.id, email: user.email, name: user.name, role: user.role, canPublish: user.canPublish, language: user.language, emailVerified: user.emailVerified } },
       { status: 201 }
     );
   } catch (error) {

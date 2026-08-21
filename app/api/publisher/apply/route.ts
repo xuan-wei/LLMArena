@@ -3,11 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { getUserFresh } from "@/lib/auth";
 import { sendAdminNewApplicationEmail } from "@/lib/email";
 import { getRequestLanguage, st } from "@/lib/i18n/server";
+import { requireVerified } from "@/lib/authGuard";
 
 export async function POST(request: Request) {
   const lang = await getRequestLanguage(request);
   const user = await getUserFresh(request);
   if (!user) return NextResponse.json({ error: st(lang, "auth.notLoggedIn") }, { status: 401 });
+  const blocked = requireVerified(user, lang); if (blocked) return blocked;
 
   // Admins and existing publishers don't need to apply
   if (user.role === "ADMIN" || user.canPublish) {

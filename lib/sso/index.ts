@@ -100,17 +100,18 @@ export async function upsertSSOUser(
   name: string,
   institution: string,
   institutionId?: string,
-): Promise<{ id: string; email: string; name: string | null; role: string; canPublish: boolean; language: string }> {
+): Promise<{ id: string; email: string; name: string | null; role: string; canPublish: boolean; language: string; emailVerified: boolean }> {
   let user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
     user = await prisma.user.create({
-      data: { email, name, passwordHash: null, institution, institutionId: institutionId ?? null, language: "zh" },
+      data: { email, name, passwordHash: null, institution, institutionId: institutionId ?? null, language: "zh", emailVerified: true },
     });
   } else {
-    // Keep institution fields up to date (e.g. student ID may change on re-login)
+    // Keep institution fields up to date (e.g. student ID may change on re-login).
+    // SSO email is authoritative, so mark it verified.
     user = await prisma.user.update({
       where: { email },
-      data: { institution, institutionId: institutionId ?? null },
+      data: { institution, institutionId: institutionId ?? null, emailVerified: true },
     });
   }
   return user;

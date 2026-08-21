@@ -51,6 +51,8 @@ prisma/dev.db-wal
 
 # Docker data volume
 /data/
+/data-staging/
+/backups/
 
 # Handoff (local only)
 handoff.md
