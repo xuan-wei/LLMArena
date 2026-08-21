@@ -3,6 +3,8 @@
 node_modules
 prisma/dev.db
 data/
+data-staging/
+backups/
 .env
 .env.local
 *.log
